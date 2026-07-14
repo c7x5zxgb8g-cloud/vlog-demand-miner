@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vlog Demand Miner"
+  short_description: "从博主视频和评论发现可调研的需求假设"
+  default_prompt: "用内置样本演示需求挖掘，查看可追溯的需求信号候选。"

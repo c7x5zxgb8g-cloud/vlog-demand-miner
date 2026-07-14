@@ -1,0 +1,18 @@
+# Local validation materials and generated review outputs.
+/work/
+/outputs/
+
+# Project-local acquisition state, artifacts, and media.
+**/.vlog-demand-miner/
+**/media/
+
+# Python and operating-system residue.
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Local credentials and environment files must never be committed.
+.env
+.env.*
+!.env.example
+*.log
