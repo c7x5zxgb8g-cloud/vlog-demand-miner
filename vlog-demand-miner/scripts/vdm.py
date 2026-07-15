@@ -463,11 +463,23 @@ def do_sync(project: Path, db: sqlite3.Connection, creator_id: str, pages: int, 
     return {"status": "ok", "task_id": row["id"], "platform": platform, "posts": len(result["posts"]), "coverage": result["coverage"], "warnings": result.get("warnings", [])}
 
 
+def commenter_identity_mode(args: argparse.Namespace) -> str:
+    """Version comment acquisition by HMAC availability without persisting a secret."""
+    env_name = str(args.commenter_hmac_key_env or "")
+    return f"hmac:{env_name}" if env_name and os.environ.get(env_name) else "unavailable"
+
+
 def do_acquire(project: Path, db: sqlite3.Connection, post_id: str, args: argparse.Namespace, media: bool) -> dict[str, Any]:
     post = db.execute("SELECT * FROM posts WHERE id=?", (post_id,)).fetchone()
     if not post: return {"status": "invalid_input", "error": "post_not_found"}
     platform = post["platform"]
-    inputs = {"post_id": post_id, "media": media, "platform": platform, "provider": f"{platform}-bridge"}
+    inputs = {
+        "post_id": post_id,
+        "media": media,
+        "platform": platform,
+        "provider": f"{platform}-bridge",
+        "commenter_identity_mode": commenter_identity_mode(args),
+    }
     row = task(db, "acquire", post_id, inputs)
     if row["status"] == "succeeded": return {"status": "reused", "task_id": row["id"]}
     db.execute("UPDATE tasks SET status='running',attempts=attempts+1,updated_at=? WHERE id=?", (now(), row["id"])); db.commit()

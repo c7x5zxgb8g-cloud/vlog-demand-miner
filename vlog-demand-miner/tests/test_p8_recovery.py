@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+import importlib.util
 
 
 CLI = Path(__file__).parents[1] / "scripts" / "vdm.py"
+SPEC = importlib.util.spec_from_file_location("vdm_for_p8_test", CLI)
+assert SPEC and SPEC.loader
+vdm = importlib.util.module_from_spec(SPEC)
+sys.path.insert(0, str(CLI.parent))
+SPEC.loader.exec_module(vdm)
 
 
 def run(project: str, *arguments: str) -> tuple[int, dict]:
@@ -31,6 +38,19 @@ def fault(project: str, kind: str, artifact_hash: str | None = None) -> tuple[st
 
 
 class P8RecoveryTests(unittest.TestCase):
+    def test_commenter_identity_mode_versions_acquisition_without_storing_secret(self) -> None:
+        args = type("Args", (), {"commenter_hmac_key_env": "VDM_TEST_COMMENT_HMAC"})()
+        previous = os.environ.pop("VDM_TEST_COMMENT_HMAC", None)
+        try:
+            self.assertEqual(vdm.commenter_identity_mode(args), "unavailable")
+            os.environ["VDM_TEST_COMMENT_HMAC"] = "not-written-to-task-input"
+            self.assertEqual(vdm.commenter_identity_mode(args), "hmac:VDM_TEST_COMMENT_HMAC")
+        finally:
+            if previous is None:
+                os.environ.pop("VDM_TEST_COMMENT_HMAC", None)
+            else:
+                os.environ["VDM_TEST_COMMENT_HMAC"] = previous
+
     def test_e2e_review_acceptance_and_recovery_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as project:
             code, demo = run(project, "demo")

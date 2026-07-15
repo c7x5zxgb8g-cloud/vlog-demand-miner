@@ -117,6 +117,16 @@ class BilibiliCli:
         executable = str(self.executable)
         if not ((self.executable.is_file() and os.access(self.executable, os.X_OK)) or shutil.which(executable)):
             raise ProviderFailure("provider_unavailable")
+        # A moved virtual environment can leave the console script present but
+        # point it at a missing interpreter or editable source tree. Execute a
+        # local-only version probe so doctor does not report that state as OK.
+        command = [str(self.executable), "--version"]
+        try:
+            completed = self.runner(command, self.timeout_seconds) if self.runner else subprocess.run(command, capture_output=True, text=True, timeout=self.timeout_seconds)
+        except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
+            raise ProviderFailure("provider_unavailable") from exc
+        if completed.returncode != 0:
+            raise ProviderFailure("provider_unavailable")
         return {"runtime": "pinned-bilibili-cli", "capabilities": ["list_posts", "fetch_post", "fetch_comments", "fetch_media"]}
 
     def list_posts(self, uid: str, max_pages: int, page_size: int) -> dict[str, Any]:

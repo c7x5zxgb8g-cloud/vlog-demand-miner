@@ -81,6 +81,10 @@ class BilibiliCliTests(unittest.TestCase):
             self.assertEqual(result["media"]["container"], "m4a")
             self.assertEqual(result["media"]["bytes"], 5)
 
+    def test_healthcheck_rejects_a_present_but_unrunnable_entrypoint(self) -> None:
+        with self.assertRaisesRegex(bridge.ProviderFailure, "provider_unavailable"):
+            self.provider(FakeRunner(code=1)).healthcheck()
+
 
 if __name__ == "__main__":
     unittest.main()
