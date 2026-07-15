@@ -1,4 +1,4 @@
 interface:
   display_name: "Vlog Demand Miner"
-  short_description: "从博主视频和评论发现可调研的需求假设"
-  default_prompt: "用内置样本演示需求挖掘，查看可追溯的需求信号候选。"
+  short_description: "从博主视频与评论中发现可追溯的市场需求候选并生成审核包"
+  default_prompt: "使用 $vlog-demand-miner 安装本机环境，并检查抖音和B站 Provider 是否就绪。"
