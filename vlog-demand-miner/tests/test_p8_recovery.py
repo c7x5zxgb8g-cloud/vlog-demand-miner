@@ -103,7 +103,7 @@ class P8RecoveryTests(unittest.TestCase):
             code, result = run(project, "--sidecar-url", "http://127.0.0.1:9", "--bilibili-cli", "/not/a/provider", "doctor")
             self.assertEqual(code, 0)
             self.assertFalse(result["healthy"])
-            self.assertEqual({item["platform"] for item in result["providers"]}, {"bilibili", "douyin"})
+            self.assertEqual({(item["platform"], item.get("mode")) for item in result["providers"]}, {("bilibili", "cli"), ("douyin", "sidecar"), ("douyin", "browser")})
             self.assertNotIn("Cookie", json.dumps(result, ensure_ascii=False))
 
 

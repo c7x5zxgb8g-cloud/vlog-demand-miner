@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 MODULE = Path(__file__).parents[1] / "scripts" / "setup_local_environment.py"
@@ -18,6 +19,9 @@ class SetupEnvironmentTests(unittest.TestCase):
     def test_model_spec_is_consistent(self) -> None:
         self.assertEqual(len(SETUP.MODEL_SHA256), 64)
         self.assertGreater(SETUP.MODEL_BYTES, SETUP.CHUNK_BYTES)
+        self.assertRegex(SETUP.PLAYWRIGHT_VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertEqual(SETUP.DEFAULT_CHEAT_DOUYIN_ADAPTER.name, "douyin-session")
+        self.assertEqual(len(SETUP.CHEAT_COMMIT), 40)
 
     def test_sha256_matches_written_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -28,6 +32,61 @@ class SetupEnvironmentTests(unittest.TestCase):
     def test_service_name_is_project_scoped(self) -> None:
         project = Path("/tmp/vdm-pilot")
         self.assertEqual(f"vlog-demand-miner/{project.name}/commenter-hmac", "vlog-demand-miner/vdm-pilot/commenter-hmac")
+
+    def test_configured_adapter_is_used_without_clone(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            adapter = root / "adapter"
+            adapter.mkdir()
+            (adapter / "crawler.py").write_text("# test\n", encoding="utf-8")
+            (adapter / "requirements.txt").write_text("playwright>=1.44\n", encoding="utf-8")
+            with patch.object(SETUP, "ensure_pinned_checkout") as checkout:
+                result = SETUP.resolve_cheat_douyin_adapter(root / "state", str(adapter))
+        self.assertEqual(result["source"], "configured")
+        self.assertEqual(result["path"], str(adapter.resolve()))
+        checkout.assert_not_called()
+
+    def test_missing_adapter_installs_pinned_upstream(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state"
+
+            def fake_checkout(source: Path, repository: str, commit: str) -> None:
+                adapter = source / "adapters" / "perf-data" / "douyin-session"
+                adapter.mkdir(parents=True)
+                (adapter / "crawler.py").write_text("# pinned\n", encoding="utf-8")
+                (adapter / "requirements.txt").write_text("playwright>=1.44\n", encoding="utf-8")
+
+            with patch.object(SETUP, "KNOWN_CHEAT_DOUYIN_ADAPTERS", ()), patch.object(SETUP, "ensure_pinned_checkout", side_effect=fake_checkout) as checkout:
+                result = SETUP.resolve_cheat_douyin_adapter(state)
+        self.assertEqual(result["source"], "managed_pinned_checkout")
+        self.assertEqual(result["commit"], SETUP.CHEAT_COMMIT)
+        checkout.assert_called_once_with(state / "upstreams" / "cheat-on-content", SETUP.CHEAT_REPOSITORY, SETUP.CHEAT_COMMIT)
+
+    def test_pinned_checkout_reuses_matching_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "upstream"
+            (source / ".git").mkdir(parents=True)
+            with patch.object(SETUP, "current_git_commit", return_value="abc"), patch.object(SETUP, "run") as command:
+                command.return_value = ""
+                SETUP.ensure_pinned_checkout(source, "https://example.invalid/repo.git", "abc")
+        command.assert_called_once_with("git", "-C", str(source), "status", "--porcelain", capture=True)
+
+    def test_next_actions_include_paths_for_ai_runner(self) -> None:
+        state = Path("/tmp/vdm-state")
+        project = Path("/tmp/vdm-project")
+        environment, actions = SETUP.build_next_actions(
+            state_dir=state,
+            project=project,
+            skill_root=Path("/tmp/vdm-skill"),
+            browser={"python": "/tmp/browser/bin/python", "upstream_adapter": "/tmp/cheat/douyin-session", "upstream_revision": "sha256:test"},
+            bilibili={"bilibili_cli": "/tmp/bilibili/bin/bili"},
+        )
+        self.assertEqual(environment["VDM_DOUYIN_BROWSER_PYTHON"], "/tmp/browser/bin/python")
+        self.assertEqual(environment["VDM_CHEAT_DOUYIN_ADAPTER_DIR"], "/tmp/cheat/douyin-session")
+        self.assertIn("VDM_CHEAT_DOUYIN_ADAPTER_REVISION", environment)
+        self.assertEqual(environment["VDM_BILIBILI_CLI"], "/tmp/bilibili/bin/bili")
+        self.assertEqual([item["name"] for item in actions], ["douyin_browser_login", "bilibili_login", "doctor"])
+        self.assertIn(str(project), actions[-1]["argv"])
 
 
 if __name__ == "__main__":

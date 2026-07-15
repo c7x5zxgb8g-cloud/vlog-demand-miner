@@ -28,6 +28,13 @@ PROVIDERS = {
     "douyin": Path(__file__).parent / "providers" / "douyin_sidecar.py",
     "bilibili": Path(__file__).parent / "providers" / "bilibili_cli.py",
 }
+DOUYIN_BROWSER_PROVIDER = Path(__file__).parent / "providers" / "douyin_browser.py"
+DOUYIN_FALLBACK_STATUSES = {
+    "sidecar_unavailable", "sidecar_http_error", "provider_protocol_error",
+    "blocked_auth", "blocked_verification", "risk_control", "schema_drift",
+    "anomalous_empty_result",
+}
+DOUYIN_PROVIDER_REVISION = "cheat-douyin-session-v4"
 
 
 def now() -> int: return int(time.time())
@@ -267,28 +274,26 @@ def do_report(project: Path, db: sqlite3.Connection, formal: bool) -> dict[str, 
     return {"status": "ok", "artifact": capture, "report_dir": str(report_dir), "report_type": payload["report_type"], "opportunities": len(payload["opportunities"]), "top_five": payload["top_five"]}
 
 
+def provider_status(command: list[str], timeout: int = 35) -> str:
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=os.environ.copy())
+        parsed = json.loads(completed.stdout)
+        return str(parsed.get("status") or "provider_protocol_error") if isinstance(parsed, dict) else "provider_protocol_error"
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+        return "provider_protocol_error"
+
+
 def do_doctor(project: Path, db: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
     """Check local provider entry points without reading credential stores."""
     checks: list[dict[str, Any]] = []
-    for platform, provider in PROVIDERS.items():
-        command = [sys.executable, str(provider)]
-        if platform == "douyin":
-            command += ["--sidecar-url", args.sidecar_url]
-        else:
-            command += ["--bilibili-cli", args.bilibili_cli]
-        command.append("healthcheck")
-        try:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=35, env=os.environ.copy())
-            parsed = json.loads(completed.stdout)
-            status = str(parsed.get("status") or "provider_protocol_error") if isinstance(parsed, dict) else "provider_protocol_error"
-        except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
-            status = "provider_protocol_error"
-        checks.append({"platform": platform, "status": status, "automatic": True})
+    checks.append({"platform": "douyin", "mode": "sidecar", "status": provider_status([sys.executable, str(PROVIDERS["douyin"]), "--sidecar-url", args.sidecar_url, "healthcheck"]), "automatic": True})
+    checks.append({"platform": "douyin", "mode": "browser", "status": provider_status(browser_provider_command(project, args) + ["healthcheck"]), "automatic": True})
+    checks.append({"platform": "bilibili", "mode": "cli", "status": provider_status([sys.executable, str(PROVIDERS["bilibili"]), "--bilibili-cli", args.bilibili_cli, "healthcheck"]), "automatic": True})
     refs = db.execute("SELECT platform, count(*) AS accounts FROM accounts GROUP BY platform ORDER BY platform").fetchall()
     credential_env = args.commenter_hmac_key_env
     return {
         "status": "ok",
-        "healthy": all(item["status"] == "ok" for item in checks),
+        "healthy": any(item["platform"] == "douyin" and item["status"] == "ok" for item in checks) and any(item["platform"] == "bilibili" and item["status"] == "ok" for item in checks),
         "providers": checks,
         "configured_accounts": [{"platform": str(row["platform"]), "accounts": int(row["accounts"])} for row in refs],
         "commenter_hmac_key_configured": bool(credential_env and os.environ.get(credential_env)),
@@ -403,6 +408,37 @@ def do_demo(project: Path, db: sqlite3.Connection) -> dict[str, Any]:
     return {"status": "ok", "fixture": fixture_path.name, "submitted_evidence": submitted, **outcome}
 
 
+def response_operation_statuses(response: dict[str, Any]) -> set[str]:
+    operations = ((response.get("data") or {}).get("operations") or []) if isinstance(response, dict) else []
+    return {str(item.get("status")) for item in operations if isinstance(item, dict) and item.get("status")}
+
+
+def invoke_provider(command: list[str], plan: Path) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(command + ["run", "--plan", str(plan)], capture_output=True, text=True, timeout=300, env=os.environ.copy())
+        return json.loads(completed.stdout)
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+        return {"status": "provider_protocol_error", "data": None}
+
+
+def browser_profile(project: Path, args: argparse.Namespace) -> Path:
+    profile = Path(args.douyin_browser_profile_dir).expanduser().resolve()
+    root, _, _ = paths(project)
+    try:
+        profile.relative_to(root.resolve())
+    except ValueError:
+        return profile
+    raise ValueError("douyin_browser_profile_must_be_outside_research_project")
+
+
+def browser_provider_command(project: Path, args: argparse.Namespace) -> list[str]:
+    command = [args.douyin_browser_python, str(DOUYIN_BROWSER_PROVIDER), "--profile-dir", str(browser_profile(project, args)),
+               "--upstream-adapter-dir", str(getattr(args, "cheat_douyin_adapter_dir", os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", "")))]
+    if args.commenter_hmac_key_env:
+        command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
+    return command
+
+
 def run_provider(project: Path, platform: str, args: argparse.Namespace, operations: list[dict[str, Any]]) -> dict[str, Any]:
     provider = PROVIDERS.get(platform)
     if not provider:
@@ -411,19 +447,33 @@ def run_provider(project: Path, platform: str, args: argparse.Namespace, operati
     with tempfile.NamedTemporaryFile("w", suffix=".json", dir=root, delete=False, encoding="utf-8") as handle:
         json.dump({"operations": operations}, handle)
         plan = Path(handle.name)
-    command = [sys.executable, str(provider)]
-    if platform == "douyin":
-        command += ["--sidecar-url", args.sidecar_url, "--media-dir", str(root / "media")]
-    elif platform == "bilibili":
-        command += ["--bilibili-cli", args.bilibili_cli, "--media-dir", str(root / "media")]
-    if args.commenter_hmac_key_env:
-        command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
-    command += ["run", "--plan", str(plan)]
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=300, env=os.environ.copy())
-        return json.loads(completed.stdout)
-    except (subprocess.TimeoutExpired, json.JSONDecodeError):
-        return {"status": "provider_protocol_error", "data": None}
+        if platform == "bilibili":
+            command = [sys.executable, str(provider), "--bilibili-cli", args.bilibili_cli, "--media-dir", str(root / "media")]
+            if args.commenter_hmac_key_env:
+                command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
+            return invoke_provider(command, plan)
+        if args.douyin_provider == "browser":
+            command = browser_provider_command(project, args)
+            response = invoke_provider(command, plan)
+            response["provider_selection"] = {"requested": "browser", "selected": "browser"}
+            return response
+        command = [sys.executable, str(provider), "--sidecar-url", args.sidecar_url, "--media-dir", str(root / "media")]
+        if args.commenter_hmac_key_env:
+            command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
+        response = invoke_provider(command, plan)
+        if args.douyin_provider == "sidecar":
+            response["provider_selection"] = {"requested": "sidecar", "selected": "sidecar"}
+            return response
+        failed = response_operation_statuses(response)
+        if response.get("status") == "provider_protocol_error" or failed.intersection(DOUYIN_FALLBACK_STATUSES):
+            fallback = invoke_provider(browser_provider_command(project, args), plan)
+            fallback["provider_selection"] = {"requested": "auto", "selected": "browser", "fallback_from": "sidecar", "reason": sorted(failed.intersection(DOUYIN_FALLBACK_STATUSES)) or ["provider_protocol_error"]}
+            return fallback
+        response["provider_selection"] = {"requested": "auto", "selected": "sidecar"}
+        return response
+    except ValueError as exc:
+        return {"status": "invalid_input", "error": str(exc), "data": None}
     finally:
         plan.unlink(missing_ok=True)
 
@@ -442,7 +492,8 @@ def do_sync(project: Path, db: sqlite3.Connection, creator_id: str, pages: int, 
     if not account:
         return {"status": "invalid_input", "error": "exactly_one_matching_platform_account_required"}
     platform = account["platform"]
-    inputs = {"creator_id": creator_id, "pages": pages, "platform": platform, "provider": f"{platform}-bridge"}
+    revision = f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli"
+    inputs = {"creator_id": creator_id, "pages": pages, "platform": platform, "provider": f"{platform}-bridge", "provider_mode": args.douyin_provider if platform == "douyin" else "cli", "provider_revision": revision}
     row = task(db, "sync", creator_id, inputs)
     if row["status"] == "succeeded": return {"status": "reused", "task_id": row["id"]}
     db.execute("UPDATE tasks SET status='running',attempts=attempts+1,updated_at=? WHERE id=?", (now(), row["id"])); db.commit()
@@ -478,6 +529,8 @@ def do_acquire(project: Path, db: sqlite3.Connection, post_id: str, args: argpar
         "media": media,
         "platform": platform,
         "provider": f"{platform}-bridge",
+        "provider_mode": args.douyin_provider if platform == "douyin" else "cli",
+        "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
         "commenter_identity_mode": commenter_identity_mode(args),
     }
     row = task(db, "acquire", post_id, inputs)
@@ -512,7 +565,7 @@ def main(args: argparse.Namespace) -> int:
             result = {"status": "invalid_input", "error": "account_id_required"}
         else:
             creator = jid(); db.execute("INSERT INTO creators VALUES (?,?,?)", (creator, args.name, now()))
-            credential_ref = args.credential_ref or ("douyin-local-sidecar" if args.platform == "douyin" else "bilibili-cli-local")
+            credential_ref = args.credential_ref or ("douyin-local-provider" if args.platform == "douyin" else "bilibili-cli-local")
             db.execute("INSERT INTO accounts VALUES (?,?,?,?,?)", (jid(), creator, args.platform, account_id, credential_ref)); db.commit()
             result = {"status": "ok", "creator_id": creator, "platform": args.platform}
     elif args.command == "sync": result = do_sync(project, db, args.creator_id, args.pages, args.platform, args)
@@ -534,6 +587,13 @@ def main(args: argparse.Namespace) -> int:
     elif args.command == "report": result = do_report(project, db, args.formal)
     elif args.command == "review": result = do_review(project, db, args.cluster_id, args.decision, args.rationale, args.traceability, args.clarity, args.actionability)
     elif args.command == "doctor": result = do_doctor(project, db, args)
+    elif args.command == "douyin-login":
+        try:
+            command = browser_provider_command(project, args) + ["login", "--wait-seconds", str(args.wait_seconds)]
+            result = provider_status(command, timeout=min(args.wait_seconds, 900) + 45)
+            result = {"status": result, "provider": "douyin-browser", "notice": "Complete login in the browser window. Login state stays in the local persistent profile and is never read or copied by VDM."}
+        except ValueError as exc:
+            result = {"status": "invalid_input", "error": str(exc)}
     elif args.command == "acceptance": result = do_acceptance(project, db)
     elif args.command == "demo": result = do_demo(project, db)
     elif args.command == "resume":
@@ -558,6 +618,11 @@ if __name__ == "__main__":
     parser.add_argument("--project", required=True)
     parser.add_argument("--sidecar-url", default="http://127.0.0.1:18080")
     parser.add_argument("--bilibili-cli", default=os.getenv("VDM_BILIBILI_CLI", "bili"))
+    parser.add_argument("--douyin-provider", choices=["auto", "sidecar", "browser"], default=os.getenv("VDM_DOUYIN_PROVIDER", "auto"))
+    parser.add_argument("--douyin-browser-python", default=os.getenv("VDM_DOUYIN_BROWSER_PYTHON", sys.executable))
+    parser.add_argument("--douyin-browser-profile-dir", default=os.getenv("VDM_DOUYIN_BROWSER_PROFILE_DIR", "~/.local/share/vlog-demand-miner/browser-profiles/douyin"))
+    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(Path.home() / ".cc-switch/skills/cheat-on-content/adapters/perf-data/douyin-session")))
+    parser.add_argument("--cheat-douyin-adapter-revision", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION", "unversioned"))
     parser.add_argument("--commenter-hmac-key-env")
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init"); init.add_argument("--name", required=True)
@@ -573,6 +638,7 @@ if __name__ == "__main__":
     report = commands.add_parser("report"); report.add_argument("--formal", action="store_true")
     review = commands.add_parser("review"); review.add_argument("--cluster-id", required=True); review.add_argument("--decision", required=True, choices=["accepted_for_research", "rejected", "needs_more_evidence"]); review.add_argument("--rationale", required=True); review.add_argument("--traceability", type=int, required=True); review.add_argument("--clarity", type=int, required=True); review.add_argument("--actionability", type=int, required=True)
     commands.add_parser("doctor")
+    login = commands.add_parser("douyin-login"); login.add_argument("--wait-seconds", type=int, default=300)
     commands.add_parser("acceptance")
     commands.add_parser("demo")
     commands.add_parser("resume"); commands.add_parser("status")
