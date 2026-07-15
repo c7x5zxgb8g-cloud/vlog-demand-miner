@@ -53,6 +53,24 @@ python3 scripts/vdm.py --project /path/to/research report
 python3 scripts/vdm.py --project /path/to/research acceptance
 ```
 
+### 本地带时间戳 ASR
+
+首选 `whisper-cpp`（本机 `whisper-cli`）和 `ffmpeg`。仓库提供的薄适配器只把本地媒体转换为
+`transcript-import` 所需的毫秒级 JSON，不访问平台、Provider 或凭证：
+
+```bash
+python3 scripts/asr_whisper_cpp.py \
+  --input /path/to/video.mp4 \
+  --output /path/to/segments.json \
+  --model /path/to/ggml-base.bin \
+  --language zh
+python3 scripts/vdm.py --project /path/to/research transcript-import \
+  --post-id "..." --segments-file /path/to/segments.json
+```
+
+适配器固定使用 CPU/BLAS 模式，避免本机无可用 Metal 上下文时 `whisper-cli` 的假成功退出。模型和
+转录工作文件应保留在 Git 忽略的本地目录；只有经 `transcript-import` 校验后的片段会进入项目 artifact。
+
 抖音的旧参数 `--sec-user-id` 仍兼容。B站首次使用前指定已固定版本的 CLI 路径，或设置同名环境变量：
 
 ```bash
