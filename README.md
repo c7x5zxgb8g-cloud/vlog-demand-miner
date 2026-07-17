@@ -1,87 +1,212 @@
-# Vlog Demand Miner
+# 下一条 NextTake
 
-从同赛道博主的公开视频、字幕和评论中提取可追溯的需求证据，聚类形成需求假设，并生成供产品负责人审核的 Markdown、HTML 和 JSON 审核包。
+**让上一条，决定下一条。**
 
-> 本项目发现的是“值得进入专业市场调研的需求候选”，不证明市场成立，也不证明用户具有支付意愿或产品具备商业可行性。
+NextTake 是一个面向个人短视频创作者的 Agent Skill：从同赛道公开视频和评论中发现真实受众问题，生成本期文案，记录人工发布结果，分析播放和评论，再生成下一条推荐与下一期完整文案。
 
-## 项目状态
-
-当前版本是可运行的试点实现，核心流程与离线演示已具备自动化测试。
-
-- 已支持抖音 Sidecar Provider。
-- 已支持固定版本的 `bilibili-cli` Provider。
-- 已支持字幕与评论双通道隔离的 Evidence ModelJob。
-- 已支持 Evidence 严格校验、跨博主聚类、确定性评分与反证记录。
-- 已支持临时/正式审核包、负责人三态回写、任务状态与中断恢复。
-- 小红书自动采集暂未启用。
-- 不包含 ASR 引擎、Vlog 画面理解、自动市场验证或自动调整评分规则。
-
-## 工作原理
-
-```mermaid
-flowchart LR
-    A[登记博主] --> B[同步作品]
-    B --> C[抽样视频]
-    C --> D[采集详情/评论/媒体]
-    D --> E[导入或读取字幕]
-    D --> F[评论 ModelJob]
-    E --> G[字幕 ModelJob]
-    F --> H[Evidence 校验]
-    G --> H
-    H --> I[跨博主聚类与评分]
-    I --> J[审核包]
-    J --> K[负责人决策]
+```text
+同赛道内容与评论
+  -> 内容机会
+  -> 本期文案
+  -> 人工拍摄和发布
+  -> 播放、互动与评论复盘
+  -> 下一条推荐
+  -> 下一期文案
 ```
 
-控制面负责项目状态、不可变 Artifact 和任务恢复；Provider 负责平台采集；模型只能读取单个 ModelJob 明确允许的一个通道，不能直接访问数据库、文件系统、Provider、网络或其他 Artifact。
+NextTake 不自动上传视频。创作者自行完成拍摄和平台发布，系统负责内容产出与优化分析。
 
-## 环境要求
+## 当前可用状态
 
-- Python 3.10 或更高版本。
-- 核心 CLI 仅使用 Python 标准库。
-- 运行测试需要 `pytest`。
-- 真实采集需要至少配置一个 Provider：抖音本机 Sidecar，或固定版本的 `bilibili-cli` 可执行文件。
+截至 2026-07-17，当前仓库已经可以运行：
 
-克隆仓库：
+- `62` 项自动测试通过；
+- 离线 Creator Studio 可以直接生成；
+- 支持桌面和移动端；
+- 支持 VDM Cluster 到创作者项目的内容机会桥接；
+- 支持本期文案、发布前判断、表现复盘、下一条推荐和下一期文案；
+- 完整保留并复用 `cheat-on-content` 的 15 个子 Skill；
+- 不需要真实平台发布权限即可完成黑客松演示。
+
+## 仓库结构
+
+仓库根目录负责 README 和改造方案，真正的 Codex Skill 位于子目录：
+
+```text
+vlog-demand-miner/                 # Git 仓库根目录
+├── README.md
+├── plans/
+└── vlog-demand-miner/             # Skill 根目录
+    ├── SKILL.md
+    ├── scripts/
+    ├── fixtures/
+    ├── references/
+    ├── tests/
+    └── vendor/cheat-on-content/
+```
+
+下面的命令均从 Git 仓库根目录执行。
+
+## 安装或更新 Codex Skill
+
+### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/c7x5zxgb8g-cloud/vlog-demand-miner.git
 cd vlog-demand-miner
 ```
 
-后续示例均从仓库根目录执行：
+### 2. 同步到 Codex Skill 目录
 
 ```bash
-export VDM_CLI="$PWD/vlog-demand-miner/scripts/vdm.py"
+mkdir -p "$HOME/.codex/skills/vlog-demand-miner"
+rsync -a \
+  --exclude '__pycache__' \
+  --exclude '*.pyc' \
+  "$PWD/vlog-demand-miner/" \
+  "$HOME/.codex/skills/vlog-demand-miner/"
 ```
 
-## 两分钟离线演示
+更新仓库后重复执行同一条 `rsync` 即可。重新打开 Codex task 后，使用 `$vlog-demand-miner` 触发 Skill。
 
-离线演示不需要登录、平台凭证或网络。它会实际执行 ModelJob 构造、Evidence 校验、聚类和评分，而不是打印预制结果。
+设置常用路径：
 
 ```bash
-export DEMO_DIR=/tmp/vdm-demo-quickstart
-python3 "$VDM_CLI" --project "$DEMO_DIR" demo
-python3 "$VDM_CLI" --project "$DEMO_DIR" report
-python3 "$VDM_CLI" --project "$DEMO_DIR" status
+export NEXTTAKE_SKILL="$HOME/.codex/skills/vlog-demand-miner"
+export VDM_CLI="$NEXTTAKE_SKILL/scripts/vdm.py"
 ```
 
-审核包会生成在：
+### 3. 验证安装
+
+```bash
+python3 "$VDM_CLI" --help
+python3 -m unittest discover -s "$NEXTTAKE_SKILL/tests" -v
+```
+
+`--help` 应包含以下命令：
 
 ```text
-/tmp/vdm-demo/reports/<content-hash>/
-├── executive-summary.md
-├── review-packet.html
-├── packet.json
-└── opportunities/
-    └── OPP-*.md
+content-prepare
+creator-attach
+creator-studio
+creator-demo
 ```
 
-演示数据只会产生需求信号候选。它不会满足真实研究的双平台、40 条有效作品等正式报告门槛。
+## 三分钟离线演示
 
-## 真实研究流程
+这是最快的使用方式，不需要网络、平台登录或模型 SDK：
 
-所有命令必须持续使用同一个 `--project` 路径。该路径是研究项目目录，不必是本代码仓库。
+```bash
+export DEMO_DIR=/tmp/nexttake-demo
+python3 "$VDM_CLI" --project "$DEMO_DIR" creator-demo
+```
+
+命令会返回：
+
+```json
+{
+  "status": "ok",
+  "product": "下一条 NextTake",
+  "opportunities": 4,
+  "studio": "/tmp/nexttake-demo/.vlog-demand-miner/creator-studio/61c7492abf1a/index.html"
+}
+```
+
+在浏览器中打开返回的 `studio` 文件。演示页面包含：
+
+1. 2026-07-15 团播试点形成的 4 个脱敏内容机会；
+2. 本期完整文案；
+3. 发布前判断；
+4. 明确标记为演示数据的播放、互动和评论；
+5. 被验证、被推翻和暂时无法判断的结论；
+6. 受众变化；
+7. 下一条推荐；
+8. 下一期完整文案。
+
+Discover 使用真实试点的脱敏 Evidence。发布和表现数据是合成演示数据，不代表作品真实发布。
+
+## 真实使用需要两个目录
+
+NextTake 把市场研究数据和个人创作数据分开保存：
+
+```bash
+export RESEARCH_DIR="$HOME/nexttake/research/group-live"
+export CREATOR_DIR="$HOME/nexttake/creator/my-channel"
+
+mkdir -p "$RESEARCH_DIR" "$CREATOR_DIR"
+```
+
+| Directory | Purpose |
+| --- | --- |
+| `RESEARCH_DIR` | 保存公开视频、评论 Evidence、Cluster 和研究 Artifact |
+| `CREATOR_DIR` | 保存草稿、预测、发布记录、复盘、Persona 和下一期文案 |
+
+不要把真实 Cookie、浏览器 Profile、Token 或平台私有响应放进任意项目目录。
+
+## 第一次使用：初始化创作者项目
+
+在 Codex 中将工作目录切换到 `CREATOR_DIR`，然后说：
+
+```text
+使用 $vlog-demand-miner 初始化 cheat-on-content 内容项目
+```
+
+根 Skill 会读取 vendored `cheat-init`，询问内容类型、典型时长、发布节奏和历史样本，并创建：
+
+```text
+<creator-project>/
+├── .cheat-state.json
+├── rubric_notes.md
+├── audience.md
+├── candidates.md
+├── scripts/
+├── predictions/
+├── videos/
+└── samples/
+```
+
+初始化成功后，下面的 `content-prepare` 才能写入内容机会。缺少 `.cheat-state.json` 时会明确返回：
+
+```text
+cheat_init_required
+```
+
+## 获取同赛道内容机会
+
+### 路线 A：使用已经存在的 VDM Cluster
+
+如果 `RESEARCH_DIR` 已经完成 Evidence 聚类，直接运行：
+
+```bash
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" content-prepare \
+  --cluster-id "OPP-..." \
+  --creator-project "$CREATOR_DIR"
+```
+
+返回结果包含：
+
+```json
+{
+  "status": "ok",
+  "candidate_id": "...",
+  "source_pack": "/path/to/creator/.nexttake/sources/<candidate-id>.md",
+  "next_action": {
+    "skill": "cheat-seed"
+  }
+}
+```
+
+该命令会：
+
+- 创建不可变 `content.opportunity` Artifact；
+- 写入符合上游 schema 的 `candidates.md` 条目；
+- 写入 `.nexttake/sources/<candidate-id>.json/.md`；
+- 保留支持证据、反证和样本限制；
+- 不自行生成另一套评分或预测逻辑。
+
+### 路线 B：从公开视频开始研究
+
+首次真实研究的命令顺序为：
 
 ```text
 init
@@ -89,412 +214,281 @@ init
   -> sync
   -> sample
   -> acquire
-  -> transcript-import（按需）
+  -> transcript-import（需要时）
   -> prepare-analysis
   -> model-job-input
   -> submit-evidence
   -> cluster
   -> report
-  -> review
 ```
 
-### 1. 初始化研究项目
+最小示例：
 
 ```bash
-export RESEARCH_DIR="$HOME/vdm-research/yoga-socks"
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" init --name "团播内容机会"
 
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  init --name "瑜伽防滑袜需求探索"
-```
-
-初始化后会创建：
-
-```text
-<research-project>/
-└── .vlog-demand-miner/
-    ├── control.db
-    ├── artifacts/
-    └── media/
-```
-
-`control.db` 保存研究控制面状态；`artifacts/` 按内容哈希保存不可变输入和结果；`media/` 保存可选下载的媒体文件。
-
-### 2. 配置 Provider
-
-#### 抖音 Sidecar
-
-抖音 Provider 默认连接本机：
-
-```text
-http://127.0.0.1:18080
-```
-
-如 Sidecar 使用其他地址，在每条需要 Provider 的命令中传入：
-
-```bash
---sidecar-url http://127.0.0.1:18080
-```
-
-凭证由 Sidecar 私有配置持有，不应写入研究项目、命令输出或报告。
-
-#### B站 CLI
-
-将固定版本的 `bilibili-cli` 可执行文件路径写入环境变量：
-
-```bash
-export VDM_BILIBILI_CLI=/absolute/path/to/bili
-```
-
-也可以在命令中使用 `--bilibili-cli /absolute/path/to/bili`。B站登录态由上游 CLI 在本机管理，本项目只调用其 JSON 接口，不保存 Cookie 或原始响应。
-
-#### 评论者匿名化密钥
-
-为跨评论去重和独立评论者覆盖统计配置项目级 HMAC 密钥：
-
-```bash
-export VDM_COMMENT_HMAC_KEY='replace-with-a-project-local-secret'
-```
-
-调用 Provider 时传递的是环境变量名称，而不是密钥值：
-
-```bash
---commenter-hmac-key-env VDM_COMMENT_HMAC_KEY
-```
-
-未配置密钥时仍可采集评论，但会产生 `commenter_identity_unavailable` 警告，独立评论者覆盖统计也会受到影响。
-
-检查本机 Provider 是否就绪：
-
-```bash
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  --bilibili-cli "$VDM_BILIBILI_CLI" \
-  --commenter-hmac-key-env VDM_COMMENT_HMAC_KEY \
-  doctor
-```
-
-`doctor` 只检查入口、可达性和配置引用，不读取或输出凭证值。
-
-### 3. 登记博主
-
-登记抖音博主，`account-id` 使用人工确认的 `sec_user_id`：
-
-```bash
 python3 "$VDM_CLI" --project "$RESEARCH_DIR" creator-add \
   --name "抖音博主 A" \
   --platform douyin \
   --account-id "<sec_user_id>"
+
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" sync \
+  --creator-id "<creator-id>" --pages 1
+
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" sample \
+  --creator-id "<creator-id>" --count 6
 ```
 
-登记 B站博主，`account-id` 使用 UID：
+Provider、ASR 和 Evidence 提交的完整步骤见 [`vlog-demand-miner/SKILL.md`](vlog-demand-miner/SKILL.md) 与 [`local-environment-setup.md`](vlog-demand-miner/references/local-environment-setup.md)。
 
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" creator-add \
-  --name "B站博主 A" \
-  --platform bilibili \
-  --account-id "<UID>"
+## 生成本期文案
+
+`content-prepare` 完成后，在 Codex 的 `CREATOR_DIR` 中说：
+
+```text
+基于 .nexttake/sources/<candidate-id>.md 讨论并生成这一条文案
 ```
 
-命令返回的 `creator_id` 会用于后续同步和抽样。抖音旧参数 `--sec-user-id` 仍兼容。
+然后依次使用：
 
-### 4. 同步作品与抽样
-
-```bash
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  --commenter-hmac-key-env VDM_COMMENT_HMAC_KEY \
-  sync --creator-id "<creator_id>" --platform douyin --pages 2
-
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  sample --creator-id "<creator_id>" --count 6
+```text
+打分这篇 scripts/<draft>.md
+启动预测 scripts/<draft>.md
+拍了 scripts/<draft>.md
 ```
 
-`sample` 返回待采集的内部 `post_ids`。同一平台内的 Provider 调用严格串行；遇到登录失效、验证码、风控或协议漂移时应保留检查点并停止该平台，不要并发或盲目重试。
+这些步骤直接复用 vendored：
 
-### 5. 采集详情、评论与媒体
+- `cheat-seed`
+- `cheat-score`
+- `cheat-predict`
+- `cheat-shoot`
 
-```bash
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  --commenter-hmac-key-env VDM_COMMENT_HMAC_KEY \
-  acquire --post-id "<post_id>" --media
+本期文案会保存在 `scripts/`，发布前判断保存在 `predictions/`。
+
+## 人工发布和复盘
+
+拍摄和平台发布由使用者自己完成。发布后在 Codex 中说：
+
+```text
+已发布 <视频链接>
 ```
 
-不需要媒体时去掉 `--media`。抖音视频会保存为供后续处理使用的媒体文件；B站在原生字幕不可用时可下载 M4A 音频供外部 ASR 使用。
+这会调用原生 `cheat-publish` 登记人工发布，不会调用平台上传 API。
 
-当前 B站桥接器的覆盖边界：
-
-- 作品同步是“最新作品数量限制”，没有历史游标，状态记为 `provider_latest_limit_no_cursor`。
-- 评论只包含热门评论，状态记为 `popular_comments_only`，不是全量评论。
-- 二级评论当前返回 `unsupported`，不会伪装成已完成采集。
-
-### 6. 导入外部转录（按需）
-
-项目不重复实现 Whisper 或其他 ASR 引擎。外部转录文件必须是 JSON，顶层可以是数组，也可以是包含 `segments` 的对象：
+准备一个只包含原始指标的 JSON：
 
 ```json
 {
-  "segments": [
-    {
-      "start_ms": 0,
-      "end_ms": 4200,
-      "text": "每次练瑜伽都得穿普通袜子，还是会打滑。"
-    }
+  "views": 12840,
+  "likes": 1126,
+  "comments": 143,
+  "shares": 216,
+  "saves": 394,
+  "follows": 87,
+  "completion_rate": 0.38,
+  "captured_at": "2026-07-16T20:00:00+08:00",
+  "top_comments": [
+    "能不能讲讲底薪、提成和流水到底怎么算？",
+    "下一期想看怎么判断公司靠不靠谱。"
   ]
 }
 ```
 
-导入命令：
+禁止加入：
+
+- 平台用户 ID；
+- 昵称、头像、电话或联系方式；
+- Cookie、Token 或请求头；
+- `likes_per_view` 等预计算比例。
+
+然后在 Codex 中运行原生复盘：
+
+```text
+复盘 videos/<video-folder>/
+更新 persona
+推荐下一条
+```
+
+## 生成下一期文案
+
+得到下一条推荐后，继续说：
+
+```text
+根据刚才的下一条推荐，生成下一期完整文案
+```
+
+这一步继续复用 `cheat-seed`，将下一期稿件写入 `scripts/<next-draft>.md`。
+
+因此一个完整周期会产生两份文案：
+
+```text
+本期文案
+  -> 人工发布
+  -> 表现复盘
+  -> 下一条推荐
+  -> 下一期文案
+```
+
+## 生成 Creator Studio
+
+原生流程完成后，将已有文件路径登记到 NextTake：
 
 ```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" transcript-import \
-  --post-id "<post_id>" \
-  --segments-file /absolute/path/to/transcript.json
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" creator-attach \
+  --creator-project "$CREATOR_DIR" \
+  --candidate-id "<candidate-id>" \
+  --script-path "scripts/<draft>.md" \
+  --prediction-path "predictions/<prediction>.md" \
+  --report-path "videos/<video>/report.md" \
+  --performance-file /absolute/path/to/raw-performance.json \
+  --audience-path "audience.md" \
+  --recommendation-path ".nexttake/recommendation.md" \
+  --next-script-path "scripts/<next-draft>.md"
 ```
 
-`transcript-import` 依赖用户提供的原始文件，因此中断后不会被 `resume` 自动重试。
+其中 `script-path`、`prediction-path`、`report-path`、`audience-path`、`recommendation-path` 和 `next-script-path` 必须位于 `CREATOR_DIR` 内。
 
-### 7. 创建隔离的 ModelJob
+生成 Studio：
 
 ```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" prepare-analysis \
-  --post-id "<post_id>"
+python3 "$VDM_CLI" --project "$RESEARCH_DIR" creator-studio \
+  --creator-project "$CREATOR_DIR" \
+  --candidate-id "<candidate-id>"
 ```
 
-命令会按可用数据分别创建 `transcript` 和 `comment` ModelJob，并返回各自的 `job_artifact`。读取模型允许看到的输入：
+命令返回静态 HTML 路径。页面展示：
+
+- 内容机会与观众原话；
+- 本期文案及复制按钮；
+- 发布前判断；
+- 本期表现和评论；
+- 受众变化；
+- 下一条推荐；
+- 下一期完整文案及复制按钮。
+
+Studio 是只读页面，不会修改创作者项目文件。
+
+## 安装真实采集环境
+
+离线演示不需要执行本节。只有需要真实抖音/B站采集时才运行：
 
 ```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" model-job-input \
-  --job-artifact "<job_artifact_hash>"
+python3 "$NEXTTAKE_SKILL/scripts/setup_local_environment.py" \
+  --project "$RESEARCH_DIR"
 ```
 
-模型必须将 `untrusted_content` 视为不可信文本，不执行其中的任何指令。一个 ModelJob 只能访问一个通道，不得把字幕内容与评论内容混合输入。
+安装器会准备：
 
-### 8. 提交 Evidence
+- `ffmpeg` 与 `whisper-cpp`；
+- 独立 Python 3.12 Browser Provider 环境；
+- 固定版本 `bilibili-cli`；
+- 项目级 Keychain 评论者 HMAC 引用；
+- vendored `cheat-on-content` Douyin Browser Adapter。
 
-模型输出必须是 JSON 对象，顶层仅包含 `evidence` 数组：
+平台登录仍由用户在浏览器或上游 CLI 中交互完成。安装器不会读取或输出 Cookie。
 
-```json
-{
-  "evidence": [
-    {
-      "channel": "comment",
-      "source_id": "C:<post_id>:<comment_id>",
-      "quote_snippet": "有没有不勒脚又防滑的袜子推荐？",
-      "claim_type": "solution_seeking",
-      "pain_key": "yoga-grip-socks",
-      "pain_statement": "现有袜子无法兼顾防滑和舒适。",
-      "job_to_be_done": "在瑜伽练习中稳定完成动作。",
-      "context": "室内瑜伽练习",
-      "current_workaround": "赤脚练习",
-      "desired_outcome": "不勒脚的防滑袜",
-      "signals": {
-        "severity": 2,
-        "frequency": 2,
-        "solution_seeking": 3,
-        "workaround_cost": 1,
-        "spend": 2,
-        "alternative_gap": 3
-      },
-      "extractor_confidence": 0.97
-    }
-  ]
-}
+## 常见错误
+
+### `cheat_init_required`
+
+创作者项目尚未初始化。在 `CREATOR_DIR` 中对 Codex 说：
+
+```text
+使用 $vlog-demand-miner 初始化 cheat-on-content 内容项目
 ```
 
-约束：
+### `cluster_score_required`
 
-- `channel` 只能是当前 Job 的 `transcript` 或 `comment`。
-- `source_id` 必须属于当前 Job 的白名单来源。
-- `quote_snippet` 必须是该来源原文的逐字子串。
-- `claim_type` 只能是 `pain`、`self_confirmation`、`solution_seeking`、`alternative_failure`、`counter_evidence`。
-- 六个 `signals` 字段必须是 `0..3` 的整数。
-- `extractor_confidence` 必须在 `0..1` 之间。
-- 未知字段、跨通道来源、伪造引用和空 Evidence 都会被拒绝。
-- 没有合格证据时不要编造，应补充采集或转录后重新创建/执行 Job。
+研究项目还没有成功执行 `cluster`。先完成 Evidence 提交和聚类。
 
-提交：
+### `cluster_not_found`
 
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" submit-evidence \
-  --job-artifact "<job_artifact_hash>" \
-  --evidence-file /absolute/path/to/evidence.json
-```
+传入的 `OPP-...` 不属于最新 Cluster Artifact。重新执行 `report` 或检查 `cluster` 输出。
 
-原始提交和校验后的 Evidence Atom 都会保存为不可变 Artifact，便于追溯和恢复。
+### `incomplete_nexttake_link`
 
-### 9. 聚类、评分与报告
+还没有通过 `creator-attach` 登记脚本、预测、复盘、表现或推荐文件。
 
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" cluster
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" report
-```
+### `views_must_be_positive`
 
-聚类只读取已校验 Evidence，以 `pain_key` 聚合并按以下维度排序：跨博主覆盖、同博主复现、独立评论者确认、严重度、频率、主动求解、替代方案成本/付费、替代方案缺口和跨平台覆盖。
+表现 JSON 的 `views` 必须大于 0。
 
-成熟度最高为 `L2_high_confidence_signal`，仍然只是需求信号，不是市场验证结论。
+### `creator_path_outside_project`
 
-正式报告需要至少两个自动 Provider 平台、至少 40 条有效作品：
+传入的创作者文件路径越出了 `CREATOR_DIR`。将文件放回创作者项目内再登记。
 
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" report --formal
-```
+### Browser Provider unavailable
 
-覆盖不足时命令返回 `E-ACQUISITION-COVERAGE-001`，只生成诊断性质的临时审核包，不会冒充正式报告。
-
-### 10. 负责人审核回写
-
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" review \
-  --cluster-id "OPP-..." \
-  --decision accepted_for_research \
-  --rationale "证据可追溯，建议进入专业市场调研。" \
-  --traceability 5 \
-  --clarity 4 \
-  --actionability 4
-```
-
-可用决策：
-
-- `accepted_for_research`：进入产品负责人专业调研。
-- `rejected`：当前候选不继续。
-- `needs_more_evidence`：需要补充证据后再判断。
-
-三项审核评分范围均为 `1..5`。每次回写都是不可变 Artifact，重新执行 `report` 会展示最新审核结论。
-
-## 状态、恢复与验收
-
-查看研究规模和任务状态：
-
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" status
-```
-
-恢复未完成任务：
-
-```bash
-python3 "$VDM_CLI" \
-  --project "$RESEARCH_DIR" \
-  --commenter-hmac-key-env VDM_COMMENT_HMAC_KEY \
-  resume
-```
-
-`resume` 只重放具有完整稳定输入的任务，包括同步、采集、ModelJob、Evidence 提交、聚类、报告和审核。已经成功的内容哈希 Artifact 与同内容审核包会复用，不会覆盖。
-
-检查试点边界：
-
-```bash
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" acceptance
-```
-
-当前验收条件：
-
-- 至少 2 个自动采集平台。
-- 至少 40 条有效作品。
-- 至少形成 3 个需求候选，报告最多展示 10 个。
-- 至少 3 个候选被负责人标记为 `accepted_for_research`。
-- Top 5 中至少 2 个候选被接受。
-- 满足正式报告覆盖门槛。
-
-即使全部通过，也只代表需求发现流程可以交给产品负责人继续研究，不代表市场、支付意愿或产品可行性成立。
+离线演示不受影响。真实采集时运行环境安装器，然后根据返回的 `next_actions` 完成人工登录和 `doctor` 检查。
 
 ## CLI 命令速查
 
-| 命令 | 用途 |
+| Command | Purpose |
 | --- | --- |
-| `init` | 初始化研究控制面和 Artifact 目录 |
-| `creator-add` | 登记抖音或 B站博主账号 |
-| `sync` | 串行同步作品库存 |
-| `sample` | 选择待采集的视频样本 |
-| `acquire` | 采集作品详情、评论和可选媒体 |
-| `transcript-import` | 导入外部 ASR/字幕时间轴 |
+| `creator-demo` | 生成完整离线 Creator Studio |
+| `content-prepare` | 把 VDM Cluster 写入创作者候选池和 source pack |
+| `creator-attach` | 登记原生创作生命周期文件与原始表现 JSON |
+| `creator-studio` | 生成只读 Creator Studio |
+| `init` | 初始化 VDM 研究项目 |
+| `creator-add` | 登记同赛道博主 |
+| `sync` | 同步作品库存 |
+| `sample` | 选择待研究作品 |
+| `acquire` | 采集详情、评论和可选媒体 |
+| `transcript-import` | 导入外部字幕/ASR 时间轴 |
 | `prepare-analysis` | 创建字幕/评论隔离 ModelJob |
-| `model-job-input` | 输出某个 Job 允许模型读取的内容 |
-| `submit-evidence` | 校验并保存模型 Evidence JSON |
-| `cluster` | 跨博主聚类并确定性评分 |
-| `report` | 生成 Markdown、HTML、JSON 审核包 |
-| `review` | 回写负责人三态决策和评分 |
-| `doctor` | 检查 Provider 入口与本机配置状态 |
-| `status` | 查看研究规模和任务状态 |
-| `resume` | 重放具备稳定输入的未完成任务 |
-| `acceptance` | 报告试点验收条件和缺口 |
-| `demo` | 运行无需网络的离线演示 |
-
-完整参数以 CLI 为准：
-
-```bash
-python3 "$VDM_CLI" --help
-python3 "$VDM_CLI" --project "$RESEARCH_DIR" <command> --help
-```
-
-注意：`--project`、`--sidecar-url`、`--bilibili-cli` 和 `--commenter-hmac-key-env` 是全局参数，应放在子命令之前。
-
-## 安全与隐私
-
-- 不把 Cookie、请求头、完整分享链接、凭证值或原始平台响应写入审核包和模型上下文。
-- 项目仅保存 `credential_ref`，真实凭证由本机 Provider 管理。
-- 评论者 ID 必须使用项目级 HMAC 密钥匿名化，不把平台原始用户 ID 暴露给模型或报告。
-- Provider stdout 必须符合 JSON 协议；协议漂移应显式失败。
-- 每个模型任务只接收白名单来源和单一通道内容。
-- `allowed_sources`、控制数据库和 Artifact 元数据不会暴露给模型。
-- Artifact 以内容哈希寻址，报告目录按内容身份生成，恢复过程不会静默覆盖同一结果。
-
-请勿将 `.env`、平台凭证、Sidecar 私有配置或真实研究媒体提交到 Git。仓库的 `.gitignore` 已忽略本地研究材料、输出目录、媒体和凭证文件。
+| `model-job-input` | 输出模型允许读取的白名单输入 |
+| `submit-evidence` | 校验并保存 Evidence |
+| `cluster` | 聚类并排序内容机会 |
+| `report` | 生成需求审核包 |
+| `review` | 回写负责人审核决定 |
+| `doctor` | 检查本机 Provider 状态 |
+| `resume` | 恢复具有稳定输入的任务 |
 
 ## 测试
 
-运行本项目测试：
+在仓库根目录运行：
 
 ```bash
-python3 -m pytest -q vlog-demand-miner/tests
+python3 -m unittest discover -s vlog-demand-miner/tests -v
 ```
 
-当前测试覆盖 Evidence 字段与引用校验、通道隔离、确定性聚类、离线演示、Provider 桥接、报告渲染和中断恢复。
+快速验证离线闭环：
 
-仓库根目录的 `work/` 用于本地 Provider 验证，可能包含独立上游项目。不要直接使用无范围的 `pytest` 收集这些上游测试；应始终指定 `vlog-demand-miner/tests`。
-
-## 仓库结构
-
-```text
-.
-├── README.md
-├── .gitignore
-└── vlog-demand-miner/
-    ├── SKILL.md
-    ├── agents/
-    │   └── openai.yaml
-    ├── fixtures/
-    │   └── demo-evidence.json
-    ├── scripts/
-    │   ├── vdm.py
-    │   ├── analysis.py
-    │   ├── reports.py
-    │   └── providers/
-    │       ├── douyin_sidecar.py
-    │       └── bilibili_cli.py
-    └── tests/
+```bash
+python3 vlog-demand-miner/scripts/vdm.py \
+  --project /tmp/nexttake-readme-check \
+  creator-demo
 ```
 
-## 已知限制
+## 能力边界
 
-- 小红书自动采集延期，当前不能计入自动 Provider 覆盖。
-- B站作品库存没有完整历史游标，评论只覆盖热门评论。
-- 抖音能力依赖本机 Sidecar 的可达性、登录状态和接口兼容性。
-- 项目不包含 ASR；没有原生字幕时需要外部转录工具。
-- 当前聚类使用规范化 `pain_key`，不会自动进行复杂语义合并。
-- 评分规则是试点版 `v0.1`，用于排序研究候选，不应用作市场规模预测。
-- 平台风控、验证码或协议变化会使 Provider 停止并保留任务状态，需要人工恢复平台能力。
+| Capability | Current status |
+| --- | --- |
+| 内容机会、两次文案、复盘和 Studio | 已实现并验证 |
+| `cheat-on-content` 15 个子 Skill | 完整保留并由根 Skill 路由 |
+| 抖音 Browser Adapter | 已接入，真实使用需要人工登录 |
+| B站、XHS、LinkedIn 上游 Adapter | 源码已保留，并非全部完成真实账号验证 |
+| 自动上传或定时发布 | 不支持，发布由创作者手动完成 |
+| 云端 SaaS、多用户和团队协作 | 不在当前范围 |
 
-## 开发约定
+不要把“源码已保留”理解为“所有外部 Adapter 已完成真实平台端到端验证”。完整矩阵见 [`cheat-on-content-integration.md`](vlog-demand-miner/references/cheat-on-content-integration.md)。
 
-- 保持 Provider 与分析核心分离；平台调用必须在平台内串行。
-- Evidence 必须经过确定性校验后才能进入聚类。
-- 新增字段或修改协议时同步更新 schema、测试和文档。
-- 不降低来源追溯、通道隔离、隐私脱敏和不可变 Artifact 约束。
-- 行为变更提交前至少运行项目测试和离线演示。
+## 安全边界
 
-## License
+- 不读取、复制或输出 Cookie、Token 和浏览器存储；
+- 评论在进入 Evidence 或 Studio 前必须匿名化；
+- 模型输出、评论和用户文本在 HTML 中全部 escape；
+- Creator Studio 是静态只读投影；
+- Demand score 是内容研究排序信号，不是流量或收入承诺；
+- 发布前判断在复盘前后通过 section hash 检查，复盘只能追加。
 
-仓库当前尚未包含开源许可证。在添加明确的 `LICENSE` 文件之前，默认保留所有权利。
+## 上游与许可证
+
+Vendored `cheat-on-content`：
+
+- Repository: `https://github.com/XBuilderLAB/cheat-on-content.git`
+- Commit: `9c42fe0c932fe81a12f07428492bdf7ae8488f41`
+- License: MIT
+
+来源和清理策略见 [`UPSTREAM.md`](vlog-demand-miner/vendor/cheat-on-content/UPSTREAM.md)，完整文件哈希见 `MANIFEST.sha256`。

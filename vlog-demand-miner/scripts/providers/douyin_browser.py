@@ -38,7 +38,9 @@ except ImportError:
 
 SCHEMA_VERSION = "1.0.0"
 VIDEO_ID = re.compile(r"/video/(\d+)")
-DEFAULT_UPSTREAM_ADAPTER = Path.home() / ".cc-switch" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session"
+SKILL_ROOT = Path(__file__).resolve().parents[2]
+VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
+DEFAULT_UPSTREAM_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
 
 
 class UpstreamAdapterUnavailable(RuntimeError):

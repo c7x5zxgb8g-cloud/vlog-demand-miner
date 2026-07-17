@@ -20,6 +20,9 @@ from pathlib import Path
 from typing import Any
 
 import analysis
+import content
+import creator_flow
+import creator_reports
 import reports
 
 SCHEMA_VERSION = "1.0.0"
@@ -35,6 +38,9 @@ DOUYIN_FALLBACK_STATUSES = {
     "anomalous_empty_result",
 }
 DOUYIN_PROVIDER_REVISION = "cheat-douyin-session-v4"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
+VENDORED_DOUYIN_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
 
 
 def now() -> int: return int(time.time())
@@ -213,6 +219,86 @@ def do_cluster(project: Path, db: sqlite3.Connection) -> dict[str, Any]:
     capture = artifact(project, db, "analysis.cluster_score", {"rubric_version": "v0.1", "clusters": clusters, "evidence_count": len(atoms)})
     db.execute("UPDATE tasks SET status='succeeded',artifact_hash=?,error_code=NULL,attempts=attempts+1,updated_at=? WHERE id=?", (capture, now(), row["id"])); db.commit()
     return {"status": "ok", "task_id": row["id"], "artifact": capture, "evidence": len(atoms), "clusters": len(clusters), "top_cluster": clusters[0]["cluster_id"] if clusters else None}
+
+
+def do_content_prepare(project: Path, db: sqlite3.Connection, cluster_id: str, creator_project: Path, snapshot_at: str) -> dict[str, Any]:
+    cluster_hash = latest_artifact(db, "cluster-score", "project")
+    if not cluster_hash:
+        return {"status": "invalid_input", "error": "cluster_score_required"}
+    try:
+        cluster_payload = read_artifact(project, cluster_hash)
+        clusters = cluster_payload.get("data", {}).get("clusters", [])
+        selected = next((item for item in clusters if isinstance(item, dict) and item.get("cluster_id") == cluster_id), None)
+        if not selected:
+            return {"status": "invalid_input", "error": "cluster_not_found"}
+        atoms = submitted_atoms(project, db)
+        opportunity = content.build_opportunity(cluster_hash, selected, atoms)
+    except (analysis.AnalysisError, content.ContentError) as exc:
+        return {"status": "invalid_input", "error": str(exc)}
+
+    inputs = {"cluster_artifact": cluster_hash, "cluster_id": cluster_id, "nexttake_schema_version": content.SCHEMA_VERSION}
+    row = task(db, "content-prepare", cluster_id, inputs)
+    capture = str(row["artifact_hash"]) if row["status"] == "succeeded" and row["artifact_hash"] else artifact(project, db, "content.opportunity", opportunity)
+    if row["status"] != "succeeded":
+        db.execute("UPDATE tasks SET status='succeeded',artifact_hash=?,error_code=NULL,attempts=attempts+1,updated_at=? WHERE id=?", (capture, now(), row["id"])); db.commit()
+    bridge_opportunity = {**opportunity, "opportunity_artifact": capture}
+    try:
+        written = creator_flow.write_opportunity(creator_project, bridge_opportunity, snapshot_at)
+    except creator_flow.CreatorFlowError as exc:
+        return {
+            "status": "invalid_input", "error": str(exc), "artifact": capture,
+            "next_action": "Run the vendored cheat-init skill in the creator project, then repeat content-prepare.",
+        }
+    return {"status": "reused" if row["status"] == "succeeded" else "ok", "artifact": capture, "cluster_id": cluster_id, **written}
+
+
+def do_creator_studio(project: Path, creator_project: Path, candidate_id: str, output_dir: Path | None = None) -> dict[str, Any]:
+    target_dir = output_dir or (paths(project)[0] / "creator-studio" / candidate_id)
+    try:
+        target = creator_reports.write_studio(creator_project, candidate_id, target_dir)
+        payload = creator_reports.load_studio_payload(creator_project, candidate_id)
+    except creator_reports.CreatorReportError as exc:
+        return {"status": "invalid_input", "error": str(exc)}
+    return {
+        "status": "ok",
+        "candidate_id": candidate_id,
+        "studio": str(target),
+        "prediction_hash": payload["prediction_hash"],
+        "demo_data": payload["performance"]["demo_data"],
+        "views": payload["performance"]["views"],
+        "ratios": payload["performance"]["ratios"],
+    }
+
+
+def do_creator_attach(args: argparse.Namespace) -> dict[str, Any]:
+    try:
+        attached = creator_flow.attach_lifecycle(
+            Path(args.creator_project), args.candidate_id,
+            script_path=args.script_path,
+            prediction_path=args.prediction_path,
+            report_path=args.report_path,
+            performance_file=args.performance_file,
+            audience_path=args.audience_path,
+            recommendation_path=args.recommendation_path,
+            next_script_path=args.next_script_path,
+        )
+    except creator_flow.CreatorFlowError as exc:
+        return {"status": "invalid_input", "error": str(exc)}
+    return {"status": "ok", **attached, "next_action": "Run creator-studio for this candidate."}
+
+
+def do_creator_demo(project: Path) -> dict[str, Any]:
+    fixture = SKILL_ROOT / "fixtures" / "creator-demo"
+    result = do_creator_studio(project, fixture, "61c7492abf1a")
+    if result.get("status") == "ok":
+        result.update({
+            "mode": "offline_fixture",
+            "product": "下一条 NextTake",
+            "notice": "Discover uses desensitized pilot evidence. Publication and performance are explicitly labeled demo data.",
+            "opportunities": 4,
+            "native_lifecycle": ["cheat-seed", "cheat-score", "cheat-predict", "cheat-shoot", "cheat-publish", "cheat-retro", "cheat-persona", "cheat-recommend"],
+        })
+    return result
 
 
 def latest_reviews(project: Path, db: sqlite3.Connection) -> tuple[dict[str, dict[str, Any]], list[str]]:
@@ -584,6 +670,10 @@ def main(args: argparse.Namespace) -> int:
         else:
             result = commit_evidence(project, db, args.job_artifact, payload)
     elif args.command == "cluster": result = do_cluster(project, db)
+    elif args.command == "content-prepare": result = do_content_prepare(project, db, args.cluster_id, Path(args.creator_project), args.snapshot_at)
+    elif args.command == "creator-studio": result = do_creator_studio(project, Path(args.creator_project), args.candidate_id, Path(args.output_dir) if args.output_dir else None)
+    elif args.command == "creator-attach": result = do_creator_attach(args)
+    elif args.command == "creator-demo": result = do_creator_demo(project)
     elif args.command == "report": result = do_report(project, db, args.formal)
     elif args.command == "review": result = do_review(project, db, args.cluster_id, args.decision, args.rationale, args.traceability, args.clarity, args.actionability)
     elif args.command == "doctor": result = do_doctor(project, db, args)
@@ -621,7 +711,7 @@ if __name__ == "__main__":
     parser.add_argument("--douyin-provider", choices=["auto", "sidecar", "browser"], default=os.getenv("VDM_DOUYIN_PROVIDER", "auto"))
     parser.add_argument("--douyin-browser-python", default=os.getenv("VDM_DOUYIN_BROWSER_PYTHON", sys.executable))
     parser.add_argument("--douyin-browser-profile-dir", default=os.getenv("VDM_DOUYIN_BROWSER_PROFILE_DIR", "~/.local/share/vlog-demand-miner/browser-profiles/douyin"))
-    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(Path.home() / ".cc-switch/skills/cheat-on-content/adapters/perf-data/douyin-session")))
+    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(VENDORED_DOUYIN_ADAPTER)))
     parser.add_argument("--cheat-douyin-adapter-revision", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION", "unversioned"))
     parser.add_argument("--commenter-hmac-key-env")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -635,6 +725,10 @@ if __name__ == "__main__":
     job_input = commands.add_parser("model-job-input"); job_input.add_argument("--job-artifact", required=True)
     submit = commands.add_parser("submit-evidence"); submit.add_argument("--job-artifact", required=True); submit.add_argument("--evidence-file", required=True)
     commands.add_parser("cluster")
+    content_prepare = commands.add_parser("content-prepare"); content_prepare.add_argument("--cluster-id", required=True); content_prepare.add_argument("--creator-project", required=True); content_prepare.add_argument("--snapshot-at", default=time.strftime("%Y-%m-%d", time.localtime()))
+    studio = commands.add_parser("creator-studio"); studio.add_argument("--creator-project", required=True); studio.add_argument("--candidate-id", required=True); studio.add_argument("--output-dir")
+    attach = commands.add_parser("creator-attach"); attach.add_argument("--creator-project", required=True); attach.add_argument("--candidate-id", required=True); attach.add_argument("--script-path", required=True); attach.add_argument("--prediction-path", required=True); attach.add_argument("--report-path", required=True); attach.add_argument("--performance-file", required=True); attach.add_argument("--audience-path", required=True); attach.add_argument("--recommendation-path", required=True); attach.add_argument("--next-script-path")
+    commands.add_parser("creator-demo")
     report = commands.add_parser("report"); report.add_argument("--formal", action="store_true")
     review = commands.add_parser("review"); review.add_argument("--cluster-id", required=True); review.add_argument("--decision", required=True, choices=["accepted_for_research", "rejected", "needs_more_evidence"]); review.add_argument("--rationale", required=True); review.add_argument("--traceability", type=int, required=True); review.add_argument("--clarity", type=int, required=True); review.add_argument("--actionability", type=int, required=True)
     commands.add_parser("doctor")

@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "candidate_id": "61c7492abf1a",
+  "cluster_id": "OPP-1E715433C0",
+  "opportunity_artifact": "demo-opportunity-61c7492abf1a",
+  "source_cluster_artifact": "pilot-report-20260715",
+  "source_json": ".nexttake/sources/61c7492abf1a.json",
+  "opportunity_index": ".nexttake/opportunities.json",
+  "source_pack": ".nexttake/sources/61c7492abf1a.md",
+  "script_path": "scripts/2026-07-13_61c7492abf1a_团播收入.md",
+  "prediction_path": "predictions/2026-07-13_61c7492abf1a_团播收入.md",
+  "report_path": "videos/2026-07-13_61c7492abf1a_团播收入/report.md",
+  "audience_path": "audience.md",
+  "recommendation_path": ".nexttake/recommendation.md",
+  "next_script_path": "scripts/2026-07-17_fe7bac4d60f3_团播面试清单.md",
+  "performance_path": ".nexttake/performance.json"
+}

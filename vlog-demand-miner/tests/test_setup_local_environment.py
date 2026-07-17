@@ -21,7 +21,16 @@ class SetupEnvironmentTests(unittest.TestCase):
         self.assertGreater(SETUP.MODEL_BYTES, SETUP.CHUNK_BYTES)
         self.assertRegex(SETUP.PLAYWRIGHT_VERSION, r"^\d+\.\d+\.\d+$")
         self.assertEqual(SETUP.DEFAULT_CHEAT_DOUYIN_ADAPTER.name, "douyin-session")
+        self.assertIn("vendor/cheat-on-content", SETUP.DEFAULT_CHEAT_DOUYIN_ADAPTER.as_posix())
         self.assertEqual(len(SETUP.CHEAT_COMMIT), 40)
+
+    def test_vendored_adapter_is_preferred_without_clone(self) -> None:
+        self.assertTrue(SETUP.is_douyin_adapter(SETUP.DEFAULT_CHEAT_DOUYIN_ADAPTER))
+        with tempfile.TemporaryDirectory() as directory, patch.object(SETUP, "ensure_pinned_checkout") as checkout:
+            result = SETUP.resolve_cheat_douyin_adapter(Path(directory))
+        self.assertEqual(result["source"], "discovered")
+        self.assertEqual(result["path"], str(SETUP.DEFAULT_CHEAT_DOUYIN_ADAPTER))
+        checkout.assert_not_called()
 
     def test_sha256_matches_written_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

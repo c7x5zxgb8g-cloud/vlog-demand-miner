@@ -1,0 +1,28 @@
+{
+  "nexttake_schema_version": "1.0.0",
+  "cluster_id": "OPP-1E715433C0",
+  "candidate_id": "61c7492abf1a",
+  "title": "潜在从业者对团播收入是否足以支撑职业选择存在明确不确定性。",
+  "source": "research:vdm",
+  "source_url": "vdm://pilot-20260715/cluster/OPP-1E715433C0",
+  "audience_problem": "潜在从业者对团播收入是否足以支撑职业选择存在明确不确定性。",
+  "job_to_be_done": "在进入团播前评估收入和职业路径。",
+  "context": "考虑从事团播的女性求职者。",
+  "demand_score": 26.9,
+  "confidence": 0.623,
+  "maturity": "L1_demand_signal",
+  "coverage": {"platforms": ["douyin"], "independent_creators": 1, "independent_commenters": 1, "distinct_posts": 1},
+  "supporting_evidence": [
+    {"evidence_id": "178e913d59cd277488b19ad4", "channel": "comment", "claim_type": "solution_seeking", "quote_snippet": "你们说女生做团播真能挣到钱吗？", "source_pointer": {"fixture": "pilot-comment-income"}}
+  ],
+  "counter_evidence": [],
+  "limitations": [
+    "当前信号未形成跨平台验证。",
+    "独立创作者覆盖少于 3 个，可能受单一账号表达影响。",
+    "独立评论者少于 5 个，评论需求信号仍偏早期。",
+    "作品覆盖少于 5 条，不代表整个赛道的稳定规律。",
+    "当前没有捕获到明确反证，不等于不存在反对意见。"
+  ],
+  "source_cluster_artifact": "pilot-report-20260715",
+  "opportunity_artifact": "demo-opportunity-61c7492abf1a"
+}

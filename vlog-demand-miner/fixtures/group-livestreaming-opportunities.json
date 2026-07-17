@@ -1,0 +1,104 @@
+{
+  "fixture_schema_version": "1.0.0",
+  "pilot_id": "group-livestreaming-demand-pilot-20260715",
+  "source_type": "desensitized_vdm_report",
+  "report_type": "provisional",
+  "coverage": {
+    "platforms": ["douyin"],
+    "effective_posts": 2,
+    "formal_eligible": false,
+    "limitations": [
+      "仅覆盖单一平台。",
+      "有效作品数为 2，远不足以代表整个团播赛道。",
+      "这些结果是内容机会假设，不是市场验证或流量承诺。"
+    ]
+  },
+  "opportunities": [
+    {
+      "rank": 1,
+      "cluster_id": "OPP-8336B1018D",
+      "demand_score": 35.2,
+      "confidence": 0.631,
+      "maturity": "L1_demand_signal",
+      "summary": {
+        "pain_statement": "直播间付费支持者在误操作后没有获得妥善的服务补救，导致流失。",
+        "job_to_be_done": "在礼物或投票误操作后获得公平且有尊重的处理。",
+        "context": "团播直播间的付费互动和中控服务。"
+      },
+      "supporting_evidence": [
+        {
+          "evidence_id": "28d693d5bd4ff68528b00e58",
+          "channel": "comment",
+          "claim_type": "alternative_failure",
+          "quote_snippet": "我给你刷了很多礼物，就一次点错了人，正常都会说点好听的，然后把票算给你，他倒好还拱火说是赖我点错了。"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "cluster_id": "OPP-BB84767533",
+      "demand_score": 29.2,
+      "confidence": 0.662,
+      "maturity": "L1_demand_signal",
+      "summary": {
+        "pain_statement": "长时长开播会带来显著的体力消耗和恢复负担。",
+        "job_to_be_done": "在较长直播工作时段后保持可持续的体力状态。",
+        "context": "开摄像头进行团播或类似直播工作时。"
+      },
+      "supporting_evidence": [
+        {
+          "evidence_id": "4b934760d8e83ca74daeaa9d",
+          "channel": "comment",
+          "claim_type": "self_confirmation",
+          "quote_snippet": "六个小时给我累得瘫了一整天。"
+        },
+        {
+          "evidence_id": "a6a1429b7925ff54494ef825",
+          "channel": "comment",
+          "claim_type": "pain",
+          "quote_snippet": "主播强度太高，没那么多时间去洗，做造型时间也紧。"
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "cluster_id": "OPP-1E715433C0",
+      "demand_score": 26.9,
+      "confidence": 0.623,
+      "maturity": "L1_demand_signal",
+      "summary": {
+        "pain_statement": "潜在从业者对团播收入是否足以支撑职业选择存在明确不确定性。",
+        "job_to_be_done": "在进入团播前评估收入和职业路径。",
+        "context": "考虑从事团播的女性求职者。"
+      },
+      "supporting_evidence": [
+        {
+          "evidence_id": "178e913d59cd277488b19ad4",
+          "channel": "comment",
+          "claim_type": "solution_seeking",
+          "quote_snippet": "你们说女生做团播真能挣到钱吗？"
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "cluster_id": "OPP-06785D2A31",
+      "demand_score": 26.0,
+      "confidence": 0.633,
+      "maturity": "L1_demand_signal",
+      "summary": {
+        "pain_statement": "团播从业者可能被要求使用暧昧话术拉票，工作要求与个人职业边界冲突。",
+        "job_to_be_done": "在入职或合作前判断团队运营要求是否可接受。",
+        "context": "团播主播选择公司和接受运营安排时。"
+      },
+      "supporting_evidence": [
+        {
+          "evidence_id": "40aaa24ab54b13066cb3559e",
+          "channel": "comment",
+          "claim_type": "pain",
+          "quote_snippet": "运营让我搞暧昧票，教怎么撩人，给了一堆话术资料。"
+        }
+      ]
+    }
+  ]
+}

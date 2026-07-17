@@ -1,0 +1,10 @@
+{
+  "fixture_schema_version": "1.0.0",
+  "pilot_id": "group-livestreaming-demand-pilot-20260715",
+  "opportunities": [
+    {"rank": 1, "cluster_id": "OPP-8336B1018D", "demand_score": 35.2, "confidence": 0.631, "maturity": "L1_demand_signal", "summary": {"pain_statement": "直播间付费支持者在误操作后没有获得妥善的服务补救，导致流失。"}},
+    {"rank": 2, "cluster_id": "OPP-BB84767533", "demand_score": 29.2, "confidence": 0.662, "maturity": "L1_demand_signal", "summary": {"pain_statement": "长时长开播会带来显著的体力消耗和恢复负担。"}},
+    {"rank": 3, "cluster_id": "OPP-1E715433C0", "demand_score": 26.9, "confidence": 0.623, "maturity": "L1_demand_signal", "summary": {"pain_statement": "潜在从业者对团播收入是否足以支撑职业选择存在明确不确定性。"}},
+    {"rank": 4, "cluster_id": "OPP-06785D2A31", "demand_score": 26.0, "confidence": 0.633, "maturity": "L1_demand_signal", "summary": {"pain_statement": "团播从业者可能被要求使用暧昧话术拉票，工作要求与个人职业边界冲突。"}}
+  ]
+}

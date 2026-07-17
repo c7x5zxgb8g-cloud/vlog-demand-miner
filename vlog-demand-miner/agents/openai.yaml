@@ -1,4 +1,4 @@
 interface:
-  display_name: "Vlog Demand Miner"
-  short_description: "从博主视频与评论中发现可追溯的市场需求候选并生成审核包"
-  default_prompt: "使用 $vlog-demand-miner 安装本机环境，并检查抖音和B站 Provider 是否就绪。"
+  display_name: "下一条 NextTake"
+  short_description: "从同赛道证据生成内容，并用发布表现决定下一条"
+  default_prompt: "使用 $vlog-demand-miner 运行 NextTake 团播离线演示，并返回 Creator Studio。"

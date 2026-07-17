@@ -25,9 +25,12 @@ MODEL_SHA256 = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
 MODEL_BYTES = 147_951_465
 CHUNK_BYTES = 8 * 1024 * 1024
 PLAYWRIGHT_VERSION = "1.55.0"
-DEFAULT_CHEAT_DOUYIN_ADAPTER = Path.home() / ".cc-switch" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
+DEFAULT_CHEAT_DOUYIN_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
 KNOWN_CHEAT_DOUYIN_ADAPTERS = (
     DEFAULT_CHEAT_DOUYIN_ADAPTER,
+    Path.home() / ".cc-switch" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
     Path.home() / ".codex" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
     Path.home() / ".agents" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
 )
