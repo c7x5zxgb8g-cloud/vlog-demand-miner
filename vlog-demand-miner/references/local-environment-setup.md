@@ -12,7 +12,7 @@ Run from the installed Skill directory. The command is idempotent and installs o
 python3 scripts/setup_local_environment.py --project /absolute/path/to/research-project
 ```
 
-It installs Homebrew `ffmpeg`, `whisper-cpp`, Python 3.12, a pinned `bilibili-cli`, a checksum-verified Whisper base model, a separate pinned Playwright runtime for the 抖音 Browser Provider, and a project-local commenter HMAC key in macOS Keychain. The Browser Provider directly bridges cheat-on-content's `douyin-session` adapter. The installer first uses the complete pinned source vendored at `vendor/cheat-on-content/`, then checks approved external installations, and only falls back to a managed checkout when neither is available. It returns the selected source, revision, executable paths, environment variables, and ordered `next_actions`; it never prints the HMAC value.
+It installs Homebrew `ffmpeg`, `whisper-cpp`, Python 3.12, a pinned `bilibili-cli`, a checksum-verified Whisper base model, a separate pinned Playwright runtime for the 抖音 Browser Provider, and a project-local commenter HMAC key in macOS Keychain. The Browser Provider uses NextTake's bundled content adapter. The installer first uses the fixed source under `vendor/content-engine/` and falls back to a managed pinned checkout only when the bundled copy is unavailable. It returns the selected revision, executable paths, public environment variables and ordered `next_actions`; it never prints the HMAC value.
 
 The upstream checkout and Browser virtual environment are idempotent. A matching pinned checkout is not fetched again, and a matching Browser runtime is not reinstalled. The script stops instead of overwriting a non-Git upstream directory or a managed checkout containing local edits.
 
@@ -66,14 +66,11 @@ Browser Provider reuses the upstream persistent browser session and passive XHR 
 Adapter discovery checks these locations in order:
 
 ```text
-<skill-root>/vendor/cheat-on-content/adapters/perf-data/douyin-session
-~/.cc-switch/skills/cheat-on-content/adapters/perf-data/douyin-session
-~/.codex/skills/cheat-on-content/adapters/perf-data/douyin-session
-~/.agents/skills/cheat-on-content/adapters/perf-data/douyin-session
-<state-dir>/upstreams/cheat-on-content/adapters/perf-data/douyin-session
+<skill-root>/vendor/content-engine/adapters/perf-data/douyin-session
+<state-dir>/upstreams/content-engine/adapters/perf-data/douyin-session
 ```
 
-The last path is installed automatically at the pinned `CHEAT_COMMIT` only when the vendored and approved external copies are absent. Set `VDM_CHEAT_ROOT` to select another complete source root, or set `VDM_CHEAT_DOUYIN_ADAPTER_DIR` / pass `--cheat-douyin-adapter-dir` for an explicit adapter path. The upstream adapter's creator-center inventory and private metrics are never used for competitor accounts; VDM only reuses its browser-session and public-video comment acquisition path.
+The managed path is installed automatically at the pinned engine revision only when the bundled copy is absent. Set `NEXTTAKE_CONTENT_ENGINE_ROOT` to select another complete source root, or set `NEXTTAKE_DOUYIN_ADAPTER_DIR` / pass `--douyin-adapter-dir` for an explicit adapter path. The adapter's creator-center inventory and private metrics are never used for competitor accounts; NextTake only uses its browser-session and public-video comment acquisition path.
 
 After setup, use the `environment` object exactly as returned, then execute the `next_actions` arrays in order. They include the absolute Browser Python, upstream adapter, persistent profile, B站 CLI, interactive login commands, project path, and final `doctor` command. Never convert or log a Keychain secret as part of this handoff.
 

@@ -36,7 +36,7 @@ class ContentPrepareCliTests(unittest.TestCase):
             self.assertEqual(reused["status"], "reused")
             self.assertEqual((creator / "candidates.md").read_text(encoding="utf-8").count(f"nexttake:{prepared['candidate_id']}:start"), 1)
 
-    def test_content_prepare_requires_native_cheat_init(self) -> None:
+    def test_content_prepare_requires_creator_init(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             research = root / "research"
@@ -45,8 +45,9 @@ class ContentPrepareCliTests(unittest.TestCase):
             _, demo = run(research, "demo")
             code, prepared = run(research, "content-prepare", "--cluster-id", demo["top_cluster"], "--creator-project", str(creator))
             self.assertEqual(code, 2)
-            self.assertEqual(prepared["error"], "cheat_init_required")
-            self.assertIn("cheat-init", prepared["next_action"])
+            self.assertEqual(prepared["error"], "creator_init_required")
+            self.assertEqual(prepared["next_action"]["action"], "initialize_creator_project")
+            self.assertNotIn("cheat", json.dumps(prepared, ensure_ascii=False).casefold())
 
     def test_prepare_attach_and_studio_form_a_complete_cli_chain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

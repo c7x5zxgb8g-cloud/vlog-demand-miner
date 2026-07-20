@@ -39,9 +39,9 @@ class DouyinBrowserProviderTests(unittest.TestCase):
         self.assertEqual(browser.browser_comment_scrolls(1), 6)
         self.assertEqual(browser.browser_comment_scrolls(100), 20)
 
-    def test_default_upstream_adapter_points_to_cheat_douyin_session(self) -> None:
+    def test_default_adapter_points_to_bundled_content_engine(self) -> None:
         self.assertEqual(browser.DEFAULT_UPSTREAM_ADAPTER.name, "douyin-session")
-        self.assertIn("vendor/cheat-on-content", browser.DEFAULT_UPSTREAM_ADAPTER.as_posix())
+        self.assertIn("vendor/content-engine", browser.DEFAULT_UPSTREAM_ADAPTER.as_posix())
 
     def test_browser_mode_refuses_media_and_reply_collection(self) -> None:
         provider = browser.BrowserProvider(Path("/tmp/vdm-browser-test"))

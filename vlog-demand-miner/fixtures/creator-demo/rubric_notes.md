@@ -1,6 +1,6 @@
 # Rubric Notes - opinion-video v0
 
-本演示 creator project 使用 vendored `cheat-on-content` 的 cold-start 观点视频流程。维度保持 v0，不根据本次 Demo performance data 修改公式。
+本演示创作者项目使用 NextTake 的冷启动观点视频流程。维度保持 v0，不根据本次演示表现修改公式。
 
 - ER: 情绪共鸣
 - HP: Hook 强度

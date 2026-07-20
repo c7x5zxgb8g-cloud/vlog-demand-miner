@@ -37,10 +37,14 @@ DOUYIN_FALLBACK_STATUSES = {
     "blocked_auth", "blocked_verification", "risk_control", "schema_drift",
     "anomalous_empty_result",
 }
-DOUYIN_PROVIDER_REVISION = "cheat-douyin-session-v4"
+DOUYIN_PROVIDER_REVISION = "nexttake-douyin-browser-v1"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
-VENDORED_DOUYIN_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
+CONTENT_ENGINE_ROOT = Path(
+    os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
+    or os.getenv("VDM_CHEAT_ROOT")
+    or str(SKILL_ROOT / "vendor" / "content-engine")
+).expanduser().resolve()
+VENDORED_DOUYIN_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
 
 
 def now() -> int: return int(time.time())
@@ -247,7 +251,10 @@ def do_content_prepare(project: Path, db: sqlite3.Connection, cluster_id: str, c
     except creator_flow.CreatorFlowError as exc:
         return {
             "status": "invalid_input", "error": str(exc), "artifact": capture,
-            "next_action": "Run the vendored cheat-init skill in the creator project, then repeat content-prepare.",
+            "next_action": {
+                "action": "initialize_creator_project",
+                "instruction": "在创作者目录中使用 NextTake 初始化创作者项目，然后重新运行 content-prepare。",
+            },
         }
     return {"status": "reused" if row["status"] == "succeeded" else "ok", "artifact": capture, "cluster_id": cluster_id, **written}
 
@@ -296,7 +303,11 @@ def do_creator_demo(project: Path) -> dict[str, Any]:
             "product": "下一条 NextTake",
             "notice": "Discover uses desensitized pilot evidence. Publication and performance are explicitly labeled demo data.",
             "opportunities": 4,
-            "native_lifecycle": ["cheat-seed", "cheat-score", "cheat-predict", "cheat-shoot", "cheat-publish", "cheat-retro", "cheat-persona", "cheat-recommend"],
+            "workflow_stages": [
+                "generate_current_draft", "score_draft", "pre_publish_prediction",
+                "register_shoot", "register_manual_publish", "retro",
+                "update_audience", "recommend_next", "generate_next_draft",
+            ],
         })
     return result
 
@@ -519,7 +530,7 @@ def browser_profile(project: Path, args: argparse.Namespace) -> Path:
 
 def browser_provider_command(project: Path, args: argparse.Namespace) -> list[str]:
     command = [args.douyin_browser_python, str(DOUYIN_BROWSER_PROVIDER), "--profile-dir", str(browser_profile(project, args)),
-               "--upstream-adapter-dir", str(getattr(args, "cheat_douyin_adapter_dir", os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", "")))]
+               "--upstream-adapter-dir", str(getattr(args, "douyin_adapter_dir", ""))]
     if args.commenter_hmac_key_env:
         command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
     return command
@@ -578,7 +589,7 @@ def do_sync(project: Path, db: sqlite3.Connection, creator_id: str, pages: int, 
     if not account:
         return {"status": "invalid_input", "error": "exactly_one_matching_platform_account_required"}
     platform = account["platform"]
-    revision = f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli"
+    revision = f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli"
     inputs = {"creator_id": creator_id, "pages": pages, "platform": platform, "provider": f"{platform}-bridge", "provider_mode": args.douyin_provider if platform == "douyin" else "cli", "provider_revision": revision}
     row = task(db, "sync", creator_id, inputs)
     if row["status"] == "succeeded": return {"status": "reused", "task_id": row["id"]}
@@ -616,7 +627,7 @@ def do_acquire(project: Path, db: sqlite3.Connection, post_id: str, args: argpar
         "platform": platform,
         "provider": f"{platform}-bridge",
         "provider_mode": args.douyin_provider if platform == "douyin" else "cli",
-        "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
+        "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
         "commenter_identity_mode": commenter_identity_mode(args),
     }
     row = task(db, "acquire", post_id, inputs)
@@ -711,8 +722,12 @@ if __name__ == "__main__":
     parser.add_argument("--douyin-provider", choices=["auto", "sidecar", "browser"], default=os.getenv("VDM_DOUYIN_PROVIDER", "auto"))
     parser.add_argument("--douyin-browser-python", default=os.getenv("VDM_DOUYIN_BROWSER_PYTHON", sys.executable))
     parser.add_argument("--douyin-browser-profile-dir", default=os.getenv("VDM_DOUYIN_BROWSER_PROFILE_DIR", "~/.local/share/vlog-demand-miner/browser-profiles/douyin"))
-    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(VENDORED_DOUYIN_ADAPTER)))
-    parser.add_argument("--cheat-douyin-adapter-revision", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION", "unversioned"))
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or str(VENDORED_DOUYIN_ADAPTER)
+    revision_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_REVISION") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION") or "bundled"
+    parser.add_argument("--douyin-adapter-dir", dest="douyin_adapter_dir", default=adapter_default)
+    parser.add_argument("--douyin-adapter-revision", dest="douyin_adapter_revision", default=revision_default)
+    parser.add_argument("--cheat-douyin-adapter-dir", dest="douyin_adapter_dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    parser.add_argument("--cheat-douyin-adapter-revision", dest="douyin_adapter_revision", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     parser.add_argument("--commenter-hmac-key-env")
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init"); init.add_argument("--name", required=True)

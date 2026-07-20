@@ -18,18 +18,22 @@ from urllib.request import Request, urlopen
 
 BILIBILI_REPOSITORY = "https://github.com/public-clis/bilibili-cli.git"
 BILIBILI_COMMIT = "dbe28551930df43b633baa52e9639832aeada967"
-CHEAT_REPOSITORY = "https://github.com/XBuilderLAB/cheat-on-content.git"
-CHEAT_COMMIT = "9c42fe0c932fe81a12f07428492bdf7ae8488f41"
+CONTENT_ENGINE_REPOSITORY = "https://github.com/XBuilderLAB/cheat-on-content.git"
+CONTENT_ENGINE_COMMIT = "9c42fe0c932fe81a12f07428492bdf7ae8488f41"
 MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
 MODEL_SHA256 = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
 MODEL_BYTES = 147_951_465
 CHUNK_BYTES = 8 * 1024 * 1024
 PLAYWRIGHT_VERSION = "1.55.0"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
-DEFAULT_CHEAT_DOUYIN_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
-KNOWN_CHEAT_DOUYIN_ADAPTERS = (
-    DEFAULT_CHEAT_DOUYIN_ADAPTER,
+CONTENT_ENGINE_ROOT = Path(
+    os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
+    or os.getenv("VDM_CHEAT_ROOT")
+    or str(SKILL_ROOT / "vendor" / "content-engine")
+).expanduser().resolve()
+DEFAULT_DOUYIN_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
+KNOWN_DOUYIN_ADAPTERS = (
+    DEFAULT_DOUYIN_ADAPTER,
     Path.home() / ".cc-switch" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
     Path.home() / ".codex" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
     Path.home() / ".agents" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
@@ -149,22 +153,22 @@ def ensure_pinned_checkout(source: Path, repository: str, commit: str) -> None:
     run("git", "-C", str(source), "checkout", "--detach", commit)
 
 
-def resolve_cheat_douyin_adapter(state_dir: Path, configured: str | None = None) -> dict[str, str]:
+def resolve_douyin_adapter(state_dir: Path, configured: str | None = None) -> dict[str, str]:
     if configured:
         adapter = Path(configured).expanduser().resolve()
         if not is_douyin_adapter(adapter):
-            raise SetupError(f"configured_cheat_douyin_adapter_invalid:{adapter}")
+            raise SetupError(f"configured_douyin_adapter_invalid:{adapter}")
         return {"path": str(adapter), "source": "configured", "revision": content_revision(adapter)}
-    for candidate in KNOWN_CHEAT_DOUYIN_ADAPTERS:
+    for candidate in KNOWN_DOUYIN_ADAPTERS:
         adapter = candidate.expanduser().resolve()
         if is_douyin_adapter(adapter):
             return {"path": str(adapter), "source": "discovered", "revision": content_revision(adapter)}
-    source = state_dir / "upstreams" / "cheat-on-content"
-    ensure_pinned_checkout(source, CHEAT_REPOSITORY, CHEAT_COMMIT)
+    source = state_dir / "upstreams" / "content-engine"
+    ensure_pinned_checkout(source, CONTENT_ENGINE_REPOSITORY, CONTENT_ENGINE_COMMIT)
     adapter = source / "adapters" / "perf-data" / "douyin-session"
     if not is_douyin_adapter(adapter):
-        raise SetupError("pinned_cheat_douyin_session_adapter_missing")
-    return {"path": str(adapter), "source": "managed_pinned_checkout", "repository": CHEAT_REPOSITORY, "commit": CHEAT_COMMIT, "revision": content_revision(adapter)}
+        raise SetupError("pinned_douyin_adapter_missing")
+    return {"path": str(adapter), "source": "managed_pinned_checkout", "commit": CONTENT_ENGINE_COMMIT, "revision": content_revision(adapter)}
 
 
 def browser_runtime_ready(executable: Path) -> bool:
@@ -185,7 +189,7 @@ def ensure_douyin_browser(state_dir: Path, upstream: dict[str, str]) -> dict[str
     adapter_dir = Path(upstream["path"])
     requirements = adapter_dir / "requirements.txt"
     if not is_douyin_adapter(adapter_dir):
-        raise SetupError("cheat_douyin_session_adapter_required")
+        raise SetupError("douyin_adapter_required")
     python = ensure_python312()
     environment = state_dir / "envs" / "douyin-browser"
     executable = environment / "bin" / "python"
@@ -214,10 +218,10 @@ def ensure_douyin_browser(state_dir: Path, upstream: dict[str, str]) -> dict[str
     return {
         "python": str(executable),
         "runtime": "playwright-chromium",
-        "upstream_adapter": str(adapter_dir),
-        "upstream_source": upstream["source"],
-        "upstream_revision": upstream["revision"],
-        "upstream_commit": upstream.get("commit", "unversioned_existing_install"),
+        "adapter_dir": str(adapter_dir),
+        "adapter_source": upstream["source"],
+        "adapter_revision": upstream["revision"],
+        "adapter_commit": upstream.get("commit", "bundled"),
         "login": "run_vdm_douyin_login_interactively",
     }
 
@@ -265,8 +269,8 @@ def build_next_actions(
     if browser:
         environment.update({
             "VDM_DOUYIN_BROWSER_PYTHON": str(browser["python"]),
-            "VDM_CHEAT_DOUYIN_ADAPTER_DIR": str(browser["upstream_adapter"]),
-            "VDM_CHEAT_DOUYIN_ADAPTER_REVISION": str(browser["upstream_revision"]),
+            "NEXTTAKE_DOUYIN_ADAPTER_DIR": str(browser["adapter_dir"]),
+            "NEXTTAKE_DOUYIN_ADAPTER_REVISION": str(browser["adapter_revision"]),
             "VDM_DOUYIN_BROWSER_PROFILE_DIR": str(state_dir / "browser-profiles" / "douyin"),
         })
         actions.append({
@@ -295,7 +299,9 @@ def main() -> int:
     parser.add_argument("--skip-asr", action="store_true", help="Repair/test providers without changing the default full installation")
     parser.add_argument("--skip-bilibili", action="store_true")
     parser.add_argument("--skip-douyin-browser", action="store_true")
-    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR"))
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR")
+    parser.add_argument("--douyin-adapter-dir", dest="douyin_adapter_dir", default=adapter_default)
+    parser.add_argument("--cheat-douyin-adapter-dir", dest="douyin_adapter_dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if platform.system() != "Darwin":
         print(json.dumps({"status": "unsupported", "error": "macos_runtime_required"}, ensure_ascii=False))
@@ -307,7 +313,7 @@ def main() -> int:
         if not args.skip_asr:
             result["asr"] = ensure_asr(state_dir / "models")
         if not args.skip_douyin_browser:
-            upstream = resolve_cheat_douyin_adapter(state_dir, args.cheat_douyin_adapter_dir)
+            upstream = resolve_douyin_adapter(state_dir, args.douyin_adapter_dir)
             result["douyin_browser"] = ensure_douyin_browser(state_dir, upstream)
         if not args.skip_bilibili:
             result["bilibili"] = ensure_bilibili(state_dir)
