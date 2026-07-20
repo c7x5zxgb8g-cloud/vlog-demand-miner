@@ -41,6 +41,7 @@ script_patterns.md
 benchmark.md
 STATUS.md
 WORKFLOW.md
+!skills/*/WORKFLOW.md
 content.db
 
 # adapter 跑过留下的

@@ -37,14 +37,23 @@ After installation, run the returned executable interactively:
 /absolute/path/from-setup/bili login
 ```
 
-Ask the user to complete QR-code login and confirm completion. Then run `doctor` or a single `sync --pages 1` health check.
+Ask the user to complete QR-code login and confirm completion. Then run `doctor` or a single `sync --pages 1` health check. NextTake rejects larger page counts. Run one creator account at a time; provider operations and separate CLI processes share the project-level serial request gate, with a random `6-12` second delay after the previous operation completes.
 
 ### 抖音 Sidecar (preferred)
 
-The installer only checks `http://127.0.0.1:18080/openapi.json`. It intentionally does not build, start, configure, or inspect a Sidecar that may contain credentials. Use the organization-approved local Sidecar deployment and let the user complete its browser/login flow. Once the Sidecar is healthy, run:
+The installer only checks `http://127.0.0.1:18080/openapi.json`. It intentionally does not build, start, configure, or inspect a Sidecar that may contain credentials. Use the organization-approved local Sidecar deployment and let the user complete its browser/login flow. A running container is not sufficient evidence: require the NextTake health check to return `status: ok`. Once the Sidecar is healthy, run:
 
 ```bash
 python3 scripts/vdm.py --project /absolute/path/to/research-project doctor
+```
+
+For a known local deployment, explicitly select the Sidecar for the first one-page smoke sync:
+
+```bash
+python3 scripts/vdm.py --project /absolute/path/to/research-project \
+  --sidecar-url http://127.0.0.1:18080 \
+  --douyin-provider sidecar \
+  sync --creator-id "<creator-id>" --platform douyin --pages 1
 ```
 
 Treat `blocked_auth`, `blocked_verification`, `risk_control`, and `schema_drift` as a stop condition. Do not retry within the platform; preserve the checkpoint and use the approved Browser Provider or ask the user to refresh the Sidecar login.
@@ -104,3 +113,18 @@ python3 scripts/vdm.py --project /tmp/vdm-demo demo
 ```
 
 The environment is ready when ASR tools, B站 CLI, Keychain credential reference, and at least one 抖音 provider is ready: the local Sidecar or the Browser Provider runtime. Platform login remains a user-controlled state, not an installation result.
+
+## Acquisition Rate Policy
+
+Live `sync` and `acquire` commands submit Provider operations serially. The default random interval is `6-12` seconds between operation completions and the next operation start, persisted per research project so separate CLI processes cannot accidentally burst. Only platform name and completion time are stored; account identifiers, request parameters, Cookie and Token values are not written to the gate.
+
+Use a more conservative bounded interval when needed:
+
+```bash
+python3 scripts/vdm.py --project /absolute/path/to/research-project \
+  --request-delay-min-seconds 10 \
+  --request-delay-max-seconds 18 \
+  sync --creator-id "<creator-id>" --platform bilibili --pages 1
+```
+
+The bounds must be numeric and non-negative, with minimum no greater than maximum. Rate controls reduce accidental high frequency; they do not bypass risk control. Stop on authentication expiry, CAPTCHA, verification, `risk_control`, or schema drift.

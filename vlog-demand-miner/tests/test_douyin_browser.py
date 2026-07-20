@@ -81,6 +81,8 @@ class DouyinBrowserProviderTests(unittest.TestCase):
             douyin_browser_profile_dir="/tmp/vdm-browser-profile",
             sidecar_url="http://127.0.0.1:9",
             commenter_hmac_key_env=None,
+            request_delay_min_seconds=0,
+            request_delay_max_seconds=0,
         )
         sidecar = {"status": "partial", "data": {"operations": [{"op": "list_posts", "status": "sidecar_unavailable"}]}}
         fallback = {"status": "ok", "data": {"operations": [{"op": "list_posts", "status": "ok", "posts": []}]}}

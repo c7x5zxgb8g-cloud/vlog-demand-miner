@@ -41,6 +41,8 @@ class CreatorReportTests(unittest.TestCase):
             self.assertIn("本期文案", html)
             self.assertIn("下一期文案", html)
             self.assertIn("下一期正文", html)
+            self.assertIn("本次研究共发现 1 个内容机会", html)
+            self.assertNotIn("团播试点", html)
             self.assertEqual(html.count("data-copy="), 2)
             for internal in ("原生 cheat-on-content 工作流", "VDM source pack", "Immutable section hash", "Article ID", "Script Path", "CMT-", "OPP-", "L1_demand_signal"):
                 self.assertNotIn(internal, html)
@@ -48,6 +50,28 @@ class CreatorReportTests(unittest.TestCase):
     def test_script_display_keeps_title_and_body_only(self) -> None:
         result = creator_reports.script_display_markdown("# 标题\n\n**Article ID**: x\n\n---\n\n正文")
         self.assertEqual(result, "# 标题\n\n正文\n")
+
+    def test_markdown_renders_tables_and_ordered_lists(self) -> None:
+        source = (
+            "# 复盘\n\n"
+            "| 指标 | 结果 |\n"
+            "| --- | ---: |\n"
+            "| 收藏 | **10%** |\n\n"
+            "1. 第一项\n"
+            "2. 第二项\n"
+        )
+        html = creator_reports.markdown_html(source)
+        self.assertIn("<table class='md-table'>", html)
+        self.assertIn("<th class='align-left'>指标</th>", html)
+        self.assertIn("<td class='align-right'><strong>10%</strong></td>", html)
+        self.assertIn("<ol><li>第一项</li><li>第二项</li></ol>", html)
+
+    def test_markdown_table_escapes_html_and_supports_literal_pipes(self) -> None:
+        source = "| 内容 | 值 |\n| --- | --- |\n| <script>alert(1)</script> | A\\|B |\n"
+        html = creator_reports.markdown_html(source)
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertIn("<td class='align-left'>A|B</td>", html)
 
     def test_prediction_hash_excludes_retro_append(self) -> None:
         before = "# X\n## 预测 v1\nbet\n## 复盘\n"

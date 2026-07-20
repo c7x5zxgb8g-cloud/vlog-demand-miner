@@ -46,11 +46,15 @@ class BilibiliCliTests(unittest.TestCase):
 
     def test_list_posts_normalizes_inventory_without_fake_pagination(self) -> None:
         runner = FakeRunner(inventory=[{"bvid": "BV1x", "title": "瑜伽练习", "duration_seconds": 90, "stats": {"view": 12, "like": 3}}])
-        result = self.provider(runner).list_posts("100", max_pages=2, page_size=20)
+        result = self.provider(runner).list_posts("100", max_pages=1, page_size=20)
         self.assertEqual(result["posts"][0]["post_id"], "BV1x")
         self.assertEqual(result["posts"][0]["duration_ms"], 90_000)
         self.assertFalse(result["coverage"]["complete"])
-        self.assertEqual(runner.commands[0][-3:], ["--max", "40", "--json"])
+        self.assertEqual(runner.commands[0][-3:], ["--max", "20", "--json"])
+
+    def test_list_posts_rejects_more_than_one_page(self) -> None:
+        with self.assertRaisesRegex(bridge.ProviderFailure, "safe_page_limit_exceeded"):
+            self.provider(FakeRunner()).list_posts("100", max_pages=2, page_size=20)
 
     def test_empty_inventory_is_anomalous_not_a_successful_sync(self) -> None:
         result = self.provider(FakeRunner(inventory=[])).action({"op": "list_posts", "uid": "100"})

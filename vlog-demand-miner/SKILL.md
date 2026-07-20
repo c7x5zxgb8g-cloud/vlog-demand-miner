@@ -119,6 +119,8 @@ init -> creator-add -> sync -> sample -> acquire
 关键纪律：
 
 - Provider 采集和模型 Evidence 提取分离；
+- 真实 Provider 操作默认串行，并在操作之间使用项目级 `6-12` 秒随机缓冲；
+- B站每次只同步一个账号且只允许 `sync --pages 1`，其他账号必须在前一命令结束后单独同步；
 - 转录与评论 ModelJob 通道隔离；
 - `quote_snippet` 必须是白名单来源的逐字子串；
 - 内容机会只是待验证假设，不证明市场或流量；
