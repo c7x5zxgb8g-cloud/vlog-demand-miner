@@ -56,6 +56,24 @@ class BilibiliCliTests(unittest.TestCase):
         with self.assertRaisesRegex(bridge.ProviderFailure, "safe_page_limit_exceeded"):
             self.provider(FakeRunner()).list_posts("100", max_pages=2, page_size=20)
 
+    def test_search_accounts_reuses_single_page_user_search(self) -> None:
+        runner = FakeRunner(video=[{"id": "100", "name": "首次租房指南", "sign": "租房避坑", "fans": 1200, "videos": 30}])
+        result = self.provider(runner).search_accounts("首次租房", page=1, limit=5)
+        self.assertEqual(result["candidates"][0]["account_id"], "100")
+        self.assertEqual(result["candidates"][0]["followers"], 1200)
+        self.assertEqual(runner.commands[0][1:], ["search", "首次租房", "--type", "user", "--page", "1", "--max", "5", "--json"])
+
+    def test_search_accounts_rejects_additional_pages(self) -> None:
+        with self.assertRaisesRegex(bridge.ProviderFailure, "safe_page_limit_exceeded"):
+            self.provider(FakeRunner()).search_accounts("首次租房", page=2, limit=5)
+
+    def test_content_search_returns_creator_signals_for_resolution(self) -> None:
+        runner = FakeRunner(video=[{"author": "租房小林", "title": "第一次租房检查清单", "play": 5000}])
+        result = self.provider(runner).search_creator_signals("首次租房", page=1, limit=10)
+        self.assertEqual(result["creators"][0]["name"], "租房小林")
+        self.assertEqual(result["creators"][0]["evidence_titles"], ["第一次租房检查清单"])
+        self.assertIn("video", runner.commands[0])
+
     def test_empty_inventory_is_anomalous_not_a_successful_sync(self) -> None:
         result = self.provider(FakeRunner(inventory=[])).action({"op": "list_posts", "uid": "100"})
         self.assertEqual(result["status"], "anomalous_empty_result")

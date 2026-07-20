@@ -13,6 +13,7 @@ import json
 import math
 import os
 import random
+import re
 import sqlite3
 import subprocess
 import sys
@@ -21,6 +22,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import analysis
 import content
@@ -38,12 +40,14 @@ DOUYIN_BROWSER_PROVIDER = Path(__file__).parent / "providers" / "douyin_browser.
 DOUYIN_FALLBACK_STATUSES = {
     "sidecar_unavailable", "sidecar_http_error", "provider_protocol_error",
     "blocked_auth", "blocked_verification", "risk_control", "schema_drift",
-    "anomalous_empty_result",
+    "anomalous_empty_result", "unsupported",
 }
 DOUYIN_PROVIDER_REVISION = "nexttake-douyin-browser-v1"
 ACQUISITION_POLICY_REVISION = "serial-low-page-jitter-v1"
 DEFAULT_REQUEST_DELAY_MIN_SECONDS = 6.0
 DEFAULT_REQUEST_DELAY_MAX_SECONDS = 12.0
+BILIBILI_PROFILE_ID = re.compile(r"^/(\d+)(?:/|$)")
+DOUYIN_PROFILE_ID = re.compile(r"/user/([^/?#]+)")
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_ENGINE_ROOT = Path(
     os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
@@ -379,7 +383,9 @@ def do_report(project: Path, db: sqlite3.Connection, formal: bool) -> dict[str, 
 
 def provider_status(command: list[str], timeout: int = 35) -> str:
     try:
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=os.environ.copy())
+        environment = os.environ.copy()
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=environment)
         parsed = json.loads(completed.stdout)
         return str(parsed.get("status") or "provider_protocol_error") if isinstance(parsed, dict) else "provider_protocol_error"
     except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
@@ -439,7 +445,9 @@ def replay_task(project: Path, db: sqlite3.Connection, row: sqlite3.Row, args: a
     except json.JSONDecodeError:
         return {"task_id": row["id"], "kind": row["kind"], "status": "unrecoverable_task_input"}
     kind = str(row["kind"])
-    if kind == "sync":
+    if kind == "account-discover":
+        result = do_creator_discover(project, db, str(inputs["track"]), [str(inputs["platform"])], list(inputs.get("keywords") or []), int(inputs["limit"]), args)
+    elif kind == "sync":
         result = do_sync(project, db, row["entity_id"], int(inputs["pages"]), inputs.get("platform"), args)
     elif kind == "acquire":
         result = do_acquire(project, db, row["entity_id"], args, bool(inputs["media"]))
@@ -518,7 +526,9 @@ def response_operation_statuses(response: dict[str, Any]) -> set[str]:
 
 def invoke_provider(command: list[str], plan: Path) -> dict[str, Any]:
     try:
-        completed = subprocess.run(command + ["run", "--plan", str(plan)], capture_output=True, text=True, timeout=300, env=os.environ.copy())
+        environment = os.environ.copy()
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        completed = subprocess.run(command + ["run", "--plan", str(plan)], capture_output=True, text=True, timeout=300, env=environment)
         return json.loads(completed.stdout)
     except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
         return {"status": "provider_protocol_error", "data": None}
@@ -707,6 +717,299 @@ def run_provider(project: Path, platform: str, args: argparse.Namespace, operati
         return {"status": "invalid_input", "error": str(exc), "data": None}
 
 
+def register_creator_account(
+    db: sqlite3.Connection,
+    *,
+    name: str,
+    platform: str,
+    account_id: str,
+    credential_ref: str | None = None,
+) -> dict[str, Any]:
+    existing = db.execute(
+        "SELECT c.id AS creator_id,c.name FROM accounts a JOIN creators c ON c.id=a.creator_id WHERE a.platform=? AND a.platform_account_id=?",
+        (platform, account_id),
+    ).fetchone()
+    if existing:
+        return {"creator_id": str(existing["creator_id"]), "name": str(existing["name"]), "platform": platform, "account_id": account_id, "added": False}
+    creator_id = jid()
+    db.execute("INSERT INTO creators VALUES (?,?,?)", (creator_id, name[:200], now()))
+    db.execute("INSERT INTO accounts VALUES (?,?,?,?,?)", (jid(), creator_id, platform, account_id, credential_ref))
+    db.commit()
+    return {"creator_id": creator_id, "name": name[:200], "platform": platform, "account_id": account_id, "added": True}
+
+
+def resolve_account_reference(
+    project: Path,
+    platform: str,
+    account_id: str | None,
+    account_url: str | None,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    direct = str(account_id or "").strip()
+    if direct:
+        return {"status": "ok", "account_id": direct, "source": "provided_id"}
+    source_url = str(account_url or "").strip()
+    if not source_url:
+        return {"status": "invalid_input", "error": "account_id_or_url_required"}
+    parsed = urlsplit(source_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or parsed.username or parsed.password:
+        return {"status": "invalid_input", "error": "supported_account_url_required"}
+    if platform == "bilibili":
+        if host != "space.bilibili.com":
+            return {"status": "invalid_input", "error": "bilibili_profile_url_required"}
+        match = BILIBILI_PROFILE_ID.search(parsed.path)
+        if not match:
+            return {"status": "invalid_input", "error": "bilibili_profile_url_required"}
+        return {"status": "ok", "account_id": match.group(1), "source": "profile_url"}
+    if platform == "douyin":
+        if not (host == "douyin.com" or host.endswith(".douyin.com")):
+            return {"status": "invalid_input", "error": "douyin_profile_or_share_url_required"}
+        match = DOUYIN_PROFILE_ID.search(parsed.path)
+        if match:
+            return {"status": "ok", "account_id": match.group(1), "source": "profile_url"}
+        response = run_provider(project, "douyin", args, [{"op": "resolve_account", "source_url": source_url}])
+        result = ((response.get("data") or {}).get("operations") or [{}])[0]
+        if response.get("status") != "ok" or result.get("status") != "ok" or not result.get("account_id"):
+            return {"status": result.get("status") or response.get("status") or "account_not_found", "error": "douyin_account_resolution_failed"}
+        return {"status": "ok", "account_id": str(result["account_id"]), "source": "share_url"}
+    return {"status": "unsupported", "error": "account_platform_unsupported"}
+
+
+def do_creator_add(project: Path, db: sqlite3.Connection, args: argparse.Namespace) -> dict[str, Any]:
+    resolved = resolve_account_reference(project, args.platform, args.account_id or args.sec_user_id, args.account_url, args)
+    if resolved.get("status") != "ok":
+        return resolved
+    credential_ref = args.credential_ref or ("douyin-local-provider" if args.platform == "douyin" else "bilibili-cli-local")
+    account = register_creator_account(
+        db,
+        name=args.name,
+        platform=args.platform,
+        account_id=str(resolved["account_id"]),
+        credential_ref=credential_ref,
+    )
+    return {"status": "ok", **account, "source": resolved["source"]}
+
+
+def discovery_keywords(track: str, supplied: list[str] | None = None) -> list[str]:
+    track = " ".join(track.split()).strip()
+    if len(track) < 2 or len(track) > 80:
+        raise ValueError("track_length_invalid")
+    values = [track]
+    if supplied:
+        values.extend(supplied)
+    else:
+        values.extend(f"{track}{suffix}" for suffix in ("经验", "避坑") if suffix not in track)
+    unique: list[str] = []
+    for value in values:
+        clean = " ".join(str(value).split()).strip()
+        if 2 <= len(clean) <= 80 and clean.casefold() not in {item.casefold() for item in unique}:
+            unique.append(clean)
+        if len(unique) == 3:
+            break
+    return unique
+
+
+def nonnegative_int(value: Any) -> int:
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def rank_account_candidates(
+    platform: str,
+    operations: list[dict[str, Any]],
+    keywords: list[str],
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    normalized_keywords = ["".join(keyword.casefold().split()) for keyword in keywords]
+    for query_index, operation in enumerate(operations):
+        query = keywords[min(query_index, len(keywords) - 1)]
+        for position, raw in enumerate(operation.get("candidates") or []):
+            if not isinstance(raw, dict):
+                continue
+            account_id = str(raw.get("account_id") or "").strip()
+            name = str(raw.get("name") or "").strip()
+            if not account_id or not name:
+                continue
+            text = "".join(f"{name} {raw.get('bio') or ''}".casefold().split())
+            matches = sum(keyword in text for keyword in normalized_keywords if keyword)
+            followers = nonnegative_int(raw.get("followers"))
+            posts = nonnegative_int(raw.get("posts"))
+            score = matches * 100 + min(math.log10(followers + 1), 7) * 3 + min(posts, 100) * 0.05 - query_index - position * 0.01
+            candidate = {
+                "platform": platform,
+                "account_id": account_id,
+                "name": name[:200],
+                "bio": str(raw.get("bio") or "")[:500],
+                "followers": followers,
+                "posts": posts,
+                "profile_url": str(raw.get("profile_url") or ""),
+                "matched_queries": [query],
+                "relevance_score": round(score, 3),
+            }
+            existing = merged.get(account_id)
+            if existing:
+                if query not in existing["matched_queries"]:
+                    existing["matched_queries"].append(query)
+                existing["relevance_score"] = max(existing["relevance_score"], candidate["relevance_score"])
+            else:
+                merged[account_id] = candidate
+    return sorted(merged.values(), key=lambda item: (-item["relevance_score"], -item["posts"], -item["followers"], item["account_id"]))
+
+
+def rank_creator_signals(operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for operation in operations:
+        query = str(operation.get("keyword") or "")
+        for raw in operation.get("creators") or []:
+            if not isinstance(raw, dict):
+                continue
+            name = str(raw.get("name") or "").strip()
+            if not name:
+                continue
+            key = "".join(name.casefold().split())
+            signal = merged.setdefault(key, {"name": name[:200], "matched_queries": [], "evidence_titles": [], "plays": 0, "occurrences": 0})
+            signal["occurrences"] += 1
+            signal["plays"] = max(signal["plays"], nonnegative_int(raw.get("plays")))
+            if query and query not in signal["matched_queries"]:
+                signal["matched_queries"].append(query)
+            for title in raw.get("evidence_titles") or []:
+                clean = str(title).strip()[:500]
+                if clean and clean not in signal["evidence_titles"]:
+                    signal["evidence_titles"].append(clean)
+    for signal in merged.values():
+        signal["relevance_score"] = round(len(signal["evidence_titles"]) * 100 + len(signal["matched_queries"]) * 2 + min(math.log10(signal["plays"] + 1), 8) * 3, 3)
+    return sorted(merged.values(), key=lambda item: (-item["relevance_score"], -item["plays"], item["name"]))
+
+
+def resolved_bilibili_candidates(signals: list[dict[str, Any]], operations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for signal, operation in zip(signals, operations):
+        rows = [item for item in operation.get("candidates") or [] if isinstance(item, dict)]
+        if not rows:
+            continue
+        expected = "".join(signal["name"].casefold().split())
+        exact = next((item for item in rows if "".join(str(item.get("name") or "").casefold().split()) == expected), None)
+        raw = exact or rows[0]
+        account_id = str(raw.get("account_id") or "").strip()
+        name = str(raw.get("name") or "").strip()
+        if not account_id or not name:
+            continue
+        followers = nonnegative_int(raw.get("followers"))
+        posts = nonnegative_int(raw.get("posts"))
+        final_score = signal["relevance_score"] + min(math.log10(followers + 1), 7) * 3 + min(posts, 100) * 0.05
+        candidates.append({
+            "platform": "bilibili",
+            "account_id": account_id,
+            "name": name[:200],
+            "bio": str(raw.get("bio") or "")[:500],
+            "followers": followers,
+            "posts": posts,
+            "profile_url": str(raw.get("profile_url") or ""),
+            "matched_queries": signal["matched_queries"],
+            "evidence_titles": signal["evidence_titles"][:5],
+            "relevance_score": round(final_score, 3),
+        })
+    return sorted(candidates, key=lambda item: (-item["relevance_score"], -item["posts"], -item["followers"], item["account_id"]))
+
+
+def do_creator_discover(
+    project: Path,
+    db: sqlite3.Connection,
+    track: str,
+    platforms: list[str] | None,
+    supplied_keywords: list[str] | None,
+    limit: int,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    try:
+        keywords = discovery_keywords(track, supplied_keywords)
+    except ValueError as exc:
+        return {"status": "invalid_input", "error": str(exc)}
+    if limit < 1 or limit > 5:
+        return {"status": "invalid_input", "error": "discovery_limit_must_be_between_1_and_5"}
+    selected_platforms = list(dict.fromkeys(platforms or sorted(PROVIDERS)))
+    outcomes: list[dict[str, Any]] = []
+    for platform in selected_platforms:
+        if platform not in PROVIDERS:
+            outcomes.append({"platform": platform, "status": "unsupported"})
+            continue
+        try:
+            policy = acquisition_policy(args, platform)
+        except ValueError as exc:
+            return {"status": "invalid_input", "error": str(exc)}
+        inputs = {
+            "track": track,
+            "platform": platform,
+            "keywords": keywords,
+            "limit": limit,
+            "provider_mode": args.douyin_provider if platform == "douyin" else "cli",
+            "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
+            "acquisition_policy": policy,
+            "discovery_revision": "account-discovery-v3-unique-content-signals",
+        }
+        row = task(db, "account-discover", platform, inputs)
+        if row["status"] == "succeeded" and row["artifact_hash"]:
+            try:
+                saved = read_artifact(project, str(row["artifact_hash"])).get("data", {})
+            except analysis.AnalysisError:
+                saved = {}
+            outcomes.append({"platform": platform, "status": "reused", **saved})
+            continue
+        db.execute("UPDATE tasks SET status='running',attempts=attempts+1,updated_at=? WHERE id=?", (now(), row["id"])); db.commit()
+        if platform == "bilibili":
+            signal_plan = [{"op": "search_creator_signals", "keyword": keyword, "page": 1, "limit": 20} for keyword in keywords]
+            signal_response = run_provider(project, platform, args, signal_plan)
+            signal_operations = ((signal_response.get("data") or {}).get("operations") or []) if isinstance(signal_response, dict) else []
+            signals = rank_creator_signals(signal_operations)[:min(max(limit * 2, 3), 5)]
+            resolution_plan = [{"op": "search_accounts", "keyword": signal["name"], "page": 1, "limit": 5} for signal in signals]
+            response = run_provider(project, platform, args, resolution_plan) if resolution_plan else signal_response
+            result_operations = ((response.get("data") or {}).get("operations") or []) if isinstance(response, dict) else []
+            ranked = resolved_bilibili_candidates(signals, result_operations)
+        else:
+            operations = [{"op": "search_accounts", "keyword": keyword, "page": 1, "limit": min(max(limit * 3, 5), 20)} for keyword in keywords]
+            response = run_provider(project, platform, args, operations)
+            result_operations = ((response.get("data") or {}).get("operations") or []) if isinstance(response, dict) else []
+            ranked = rank_account_candidates(platform, result_operations, keywords)
+        if not ranked:
+            statuses = [str(item.get("status")) for item in result_operations if isinstance(item, dict) and item.get("status")]
+            code = statuses[-1] if statuses else str(response.get("status") or "account_discovery_failed")
+            failure = {"platform": platform, "status": code, "candidates": [], "selected": [], "warnings": response.get("warnings") or []}
+            capture = artifact(project, db, "account.discovery", {"track": track, "keywords": keywords, **failure})
+            db.execute("UPDATE tasks SET status=?,artifact_hash=?,error_code=?,updated_at=? WHERE id=?", (code, capture, code, now(), row["id"])); db.commit()
+            outcomes.append(failure)
+            continue
+        selected = []
+        for candidate in ranked[:limit]:
+            selected.append(register_creator_account(
+                db,
+                name=candidate["name"],
+                platform=platform,
+                account_id=candidate["account_id"],
+                credential_ref="douyin-local-provider" if platform == "douyin" else "bilibili-cli-local",
+            ))
+        discovery = {
+            "track": track,
+            "keywords": keywords,
+            "candidates": ranked,
+            "selected": selected,
+            "warnings": ["search_candidates_require_content_review", "search_relevance_is_not_demand_validation"],
+        }
+        capture = artifact(project, db, "account.discovery", discovery)
+        db.execute("UPDATE tasks SET status='succeeded',artifact_hash=?,error_code=NULL,updated_at=? WHERE id=?", (capture, now(), row["id"])); db.commit()
+        outcomes.append({"platform": platform, "status": "ok", **discovery})
+    success = [item for item in outcomes if item.get("status") in {"ok", "reused"}]
+    return {
+        "status": "ok" if len(success) == len(outcomes) else "partial" if success else "account_discovery_failed",
+        "track": track,
+        "keywords": keywords,
+        "platforms": outcomes,
+        "notice": "Discovered accounts are relevance candidates for content research, not evidence of demand or performance.",
+    }
+
+
 def one_account(db: sqlite3.Connection, creator_id: str, platform: str | None) -> sqlite3.Row | None:
     query, values = "SELECT * FROM accounts WHERE creator_id=?", [creator_id]
     if platform:
@@ -805,14 +1108,9 @@ def main(args: argparse.Namespace) -> int:
         print(dump({"status": "ok", "project": str(project), "schema_version": SCHEMA_VERSION})); return 0
     db = connect(project)
     if args.command == "creator-add":
-        account_id = args.account_id or args.sec_user_id
-        if not account_id:
-            result = {"status": "invalid_input", "error": "account_id_required"}
-        else:
-            creator = jid(); db.execute("INSERT INTO creators VALUES (?,?,?)", (creator, args.name, now()))
-            credential_ref = args.credential_ref or ("douyin-local-provider" if args.platform == "douyin" else "bilibili-cli-local")
-            db.execute("INSERT INTO accounts VALUES (?,?,?,?,?)", (jid(), creator, args.platform, account_id, credential_ref)); db.commit()
-            result = {"status": "ok", "creator_id": creator, "platform": args.platform}
+        result = do_creator_add(project, db, args)
+    elif args.command == "creator-discover":
+        result = do_creator_discover(project, db, args.track, args.platform, args.keyword, args.limit, args)
     elif args.command == "sync": result = do_sync(project, db, args.creator_id, args.pages, args.platform, args)
     elif args.command == "sample":
         rows = db.execute("SELECT id FROM posts WHERE creator_id=? AND content_type='video' ORDER BY published_at DESC, id", (args.creator_id,)).fetchall()
@@ -881,7 +1179,8 @@ if __name__ == "__main__":
     parser.add_argument("--request-delay-max-seconds", default=os.getenv("VDM_REQUEST_DELAY_MAX_SECONDS", str(DEFAULT_REQUEST_DELAY_MAX_SECONDS)))
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init"); init.add_argument("--name", required=True)
-    add = commands.add_parser("creator-add"); add.add_argument("--name", required=True); add.add_argument("--platform", choices=sorted(PROVIDERS), default="douyin"); add.add_argument("--account-id"); add.add_argument("--sec-user-id"); add.add_argument("--credential-ref")
+    add = commands.add_parser("creator-add"); add.add_argument("--name", required=True); add.add_argument("--platform", choices=sorted(PROVIDERS), default="douyin"); add.add_argument("--account-id"); add.add_argument("--account-url"); add.add_argument("--sec-user-id"); add.add_argument("--credential-ref")
+    discover = commands.add_parser("creator-discover"); discover.add_argument("--track", required=True); discover.add_argument("--platform", action="append", choices=sorted(PROVIDERS)); discover.add_argument("--keyword", action="append"); discover.add_argument("--limit", type=int, default=3)
     sync = commands.add_parser("sync"); sync.add_argument("--creator-id", required=True); sync.add_argument("--platform", choices=sorted(PROVIDERS)); sync.add_argument("--pages", type=int, default=1)
     sample = commands.add_parser("sample"); sample.add_argument("--creator-id", required=True); sample.add_argument("--count", type=int, default=6)
     acquire = commands.add_parser("acquire"); acquire.add_argument("--post-id", required=True); acquire.add_argument("--media", action="store_true")

@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -45,6 +46,14 @@ class FakeClock:
 
 
 class AcquisitionPolicyTests(unittest.TestCase):
+    def test_provider_processes_disable_bytecode_writes(self) -> None:
+        completed = subprocess.CompletedProcess(["provider"], 0, '{"status":"ok","data":{}}', "")
+        with tempfile.TemporaryDirectory() as directory, patch.object(vdm.subprocess, "run", return_value=completed) as run:
+            plan = Path(directory) / "plan.json"
+            plan.write_text('{"operations":[]}', encoding="utf-8")
+            vdm.invoke_provider(["provider"], plan)
+        self.assertEqual(run.call_args.kwargs["env"]["PYTHONDONTWRITEBYTECODE"], "1")
+
     def test_bilibili_sync_rejects_more_than_one_page_before_provider(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)

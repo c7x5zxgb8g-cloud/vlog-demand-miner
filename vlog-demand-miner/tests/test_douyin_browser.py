@@ -39,6 +39,10 @@ class DouyinBrowserProviderTests(unittest.TestCase):
         self.assertEqual(browser.browser_comment_scrolls(1), 6)
         self.assertEqual(browser.browser_comment_scrolls(100), 20)
 
+    def test_visible_account_id_only_uses_profile_path(self) -> None:
+        self.assertEqual(browser.visible_account_id("https://www.douyin.com/user/MS4-test?from=search"), "MS4-test")
+        self.assertEqual(browser.visible_account_id("https://www.douyin.com/video/123"), "")
+
     def test_default_adapter_points_to_bundled_content_engine(self) -> None:
         self.assertEqual(browser.DEFAULT_UPSTREAM_ADAPTER.name, "douyin-session")
         self.assertIn("vendor/content-engine", browser.DEFAULT_UPSTREAM_ADAPTER.as_posix())

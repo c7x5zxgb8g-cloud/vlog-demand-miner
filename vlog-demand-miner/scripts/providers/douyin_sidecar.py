@@ -68,6 +68,22 @@ def unwrap(payload: Any) -> dict[str, Any]:
     return payload["data"]
 
 
+def unwrap_value(payload: Any) -> Any:
+    if not isinstance(payload, dict) or payload.get("code") != 200 or "data" not in payload:
+        raise SidecarFailure("schema_drift")
+    return payload["data"]
+
+
+def validate_douyin_url(value: str) -> str:
+    parsed = urlsplit(value.strip())
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (host == "douyin.com" or host.endswith(".douyin.com")):
+        raise SidecarFailure("invalid_input")
+    if parsed.username or parsed.password:
+        raise SidecarFailure("invalid_input")
+    return value.strip()
+
+
 def pick_list(data: dict[str, Any], *keys: str) -> list[dict[str, Any]]:
     for key in keys:
         value = data.get(key)
@@ -184,10 +200,20 @@ class DouyinProvider:
 
     def healthcheck(self) -> dict[str, Any]:
         paths = self.sidecar.get_json("/openapi.json").get("paths")
-        required = {f"{API_PREFIX}/fetch_one_video", f"{API_PREFIX}/fetch_user_post_videos", f"{API_PREFIX}/fetch_video_comments", f"{API_PREFIX}/fetch_video_comment_replies", "/api/download"}
+        required = {f"{API_PREFIX}/fetch_one_video", f"{API_PREFIX}/fetch_user_post_videos", f"{API_PREFIX}/fetch_video_comments", f"{API_PREFIX}/fetch_video_comment_replies", f"{API_PREFIX}/get_sec_user_id", "/api/download"}
         if not isinstance(paths, dict) or not required.issubset(paths):
             raise SidecarFailure("schema_drift")
         return {"runtime": "local-douyin-sidecar", "capabilities": sorted(required)}
+
+    def resolve_account(self, source_url: str) -> dict[str, Any]:
+        value = unwrap_value(self.sidecar.get_json(f"{API_PREFIX}/get_sec_user_id", {"url": validate_douyin_url(source_url)}))
+        if isinstance(value, dict):
+            account_id = str(value.get("sec_user_id") or value.get("sec_uid") or "")
+        else:
+            account_id = str(value or "")
+        if not account_id:
+            raise SidecarFailure("account_not_found")
+        return {"status": "ok", "account_id": account_id}
 
     def fetch_post(self, aweme_id: str) -> dict[str, Any]:
         data = unwrap(self.sidecar.get_json(f"{API_PREFIX}/fetch_one_video", {"aweme_id": aweme_id}))
@@ -259,6 +285,10 @@ class DouyinProvider:
         page_size = min(max(as_int(operation.get("page_size") or 20), 1), 20)
         max_pages = max(as_int(operation.get("max_pages") or 1), 1)
         try:
+            if kind == "search_accounts":
+                return {"op": kind, "status": "unsupported", "recovery": {"action": "use_browser_search_or_manual_account"}, "warnings": ["sidecar_search_endpoint_unavailable"]}
+            if kind == "resolve_account":
+                return {"op": kind, **self.resolve_account(str(operation["source_url"]))}
             if kind == "fetch_post":
                 return {"op": kind, **self.fetch_post(str(operation["aweme_id"]))}
             if kind == "list_posts":
