@@ -5,23 +5,23 @@
 1. Select a real VDM Cluster.
 2. Preserve supporting Evidence, counter Evidence and coverage limitations.
 3. Run `content-prepare` to create an upstream-compatible candidate and source pack.
-4. Use native `cheat-seed` for topic discussion and draft creation.
+4. Run the NextTake “生成本期文案” action for topic discussion and draft creation.
 
 ## Before Publication
 
 1. The creator rewrites the draft in their own voice.
-2. Use native `cheat-score` and challenge weak dimensions.
-3. Use native `cheat-predict` before seeing platform results.
+2. Run “给本期文案打分” and challenge weak dimensions.
+3. Run “启动发布前预测” before seeing platform results.
 4. Record a falsifiable bet and keep the prediction section immutable.
-5. Use native `cheat-shoot` and `cheat-publish`; publishing remains manual.
+5. Run “登记已拍摄” and “登记已发布”; publishing remains manual.
 
 ## After Publication
 
 1. Import raw counts and anonymous top-comment text only.
 2. Reject identity fields, zero views, negative counts and payloads over the project limit.
 3. Recompute interaction ratios deterministically.
-4. Use native `cheat-retro` to mark predictions validated, refuted or inconclusive.
-5. Use native `cheat-persona` and `cheat-recommend` for the next cycle.
+4. Run “复盘本期内容” to mark predictions validated, refuted or inconclusive.
+5. Run “更新受众画像” and “推荐下一条” for the next cycle.
 
 ## Evidence Discipline
 

@@ -130,6 +130,8 @@ class BilibiliCli:
         return {"runtime": "pinned-bilibili-cli", "capabilities": ["list_posts", "fetch_post", "fetch_comments", "fetch_media"]}
 
     def list_posts(self, uid: str, max_pages: int, page_size: int) -> dict[str, Any]:
+        if max_pages != 1:
+            raise ProviderFailure("safe_page_limit_exceeded")
         limit = min(max(max_pages, 1) * min(max(page_size, 1), 50), 1_000)
         data = self._run(["user-videos", uid, "--max", str(limit)])
         if not isinstance(data, list):

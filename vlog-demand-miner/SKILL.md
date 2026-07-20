@@ -1,48 +1,49 @@
 ---
 name: vlog-demand-miner
-description: NextTake 下一条：从同赛道公开视频和评论 Evidence 发现内容机会，直接复用完整 cheat-on-content 完成 seed、score、blind predict、shoot、manual publish、retro、persona 和 recommend，再生成 Creator Studio。触发词包括“找选题”“生成脚本”“启动预测”“已发布”“复盘”“下一条”“分析同赛道评论”。
+description: NextTake 下一条：从同赛道公开视频和评论中发现内容机会，生成本期文案，完成发布前判断、人工发布登记、数据复盘、受众更新、下一条推荐和下一期文案。触发词包括“初始化创作者项目”“找选题”“生成脚本”“启动预测”“已发布”“复盘”“下一条”“分析同赛道评论”。
 ---
 
 # 下一条 NextTake
 
 > 让上一条，决定下一条。
 
-本 Skill 是个人创作者内容创作与发布优化系统。平台发布由创作者手动完成；系统负责证据发现、内容生成、发布前判断、发布后复盘和下一条推荐。
+NextTake 是面向个人短视频创作者的内容创作与发布优化系统。平台发布由创作者手动完成；NextTake 负责证据发现、内容生成、发布前判断、发布后复盘和下一条推荐。
 
-## 最高实现原则：Reuse First
+## Public Contract
 
-`vendor/cheat-on-content/` 已有的业务能力必须直接复用，不在 NextTake 中另写第二套实现。
+对使用者只暴露 NextTake 品牌和以下自然语言动作：
 
-执行任何创作生命周期动作前，读取对应的 vendored 子 Skill：
-
-| User intent | Required source of truth |
+| 用户意图 | NextTake 动作 |
 | --- | --- |
-| 初始化内容项目 | `vendor/cheat-on-content/skills/cheat-init/SKILL.md` |
-| 找对标 | `vendor/cheat-on-content/skills/cheat-learn-from/SKILL.md` |
-| 讨论选题、生成 draft | `vendor/cheat-on-content/skills/cheat-seed/SKILL.md` |
-| 打分 | `vendor/cheat-on-content/skills/cheat-score/SKILL.md` |
-| 启动发布前预测 | `vendor/cheat-on-content/skills/cheat-predict/SKILL.md` |
-| 登记已拍摄 | `vendor/cheat-on-content/skills/cheat-shoot/SKILL.md` |
-| 登记人工发布 | `vendor/cheat-on-content/skills/cheat-publish/SKILL.md` |
-| 导入表现并复盘 | `vendor/cheat-on-content/skills/cheat-retro/SKILL.md` |
-| 更新真实受众画像 | `vendor/cheat-on-content/skills/cheat-persona/SKILL.md` |
-| 推荐下一条 | `vendor/cheat-on-content/skills/cheat-recommend/SKILL.md` |
-| 热点、Rubric、状态、迁移 | 对应 `cheat-trends`、`cheat-bump`、`cheat-status`、`cheat-migrate` |
+| 首次使用 | 初始化创作者项目 |
+| 寻找参考 | 导入对标账号 |
+| 讨论选题并写稿 | 生成本期文案 |
+| 检查稿件质量 | 给本期文案打分 |
+| 发布前承诺 | 启动发布前预测 |
+| 拍摄完成 | 登记已拍摄 |
+| 用户手动发布后 | 登记已发布 |
+| 导入播放与评论 | 复盘本期内容 |
+| 从评论更新认知 | 更新受众画像 |
+| 选择下一条 | 推荐下一条 |
+| 延续推荐写稿 | 生成下一期文案 |
+| 查看进度 | 查看创作状态 |
+| 调整评分体系 | 更新评分规则 |
 
-如果输入格式不同，只写 converter/adapter；如果上游暂时跑不通，优先修兼容或使用上游的手工入口，不立即造替代流程。
+不得在面向用户的回复、错误、CLI JSON、Studio、README 示例或生成文档中输出内部引擎品牌、内部命令前缀、内部状态文件名和内部工作流路径。
+
+执行创作者生命周期动作前，读取 `references/internal-content-engine.md`，再读取其中映射的内部工作流。内部实现只负责复用，所有输入提示和输出必须翻译成上表中的 NextTake 动作。
 
 ## Product Flow
 
 ```text
-VDM research
-  -> Demand Cluster
-  -> content-prepare
-  -> candidate + source pack
-  -> native cheat-seed / score / predict
-  -> native cheat-shoot / publish
-  -> native cheat-retro / persona / recommend
-  -> creator-attach
-  -> creator-studio
+同赛道研究
+  -> 内容机会
+  -> 写入创作者候选池
+  -> 本期文案 / 打分 / 发布前预测
+  -> 登记拍摄 / 登记人工发布
+  -> 表现复盘 / 受众更新 / 下一条推荐
+  -> 下一期文案
+  -> Creator Studio
 ```
 
 ## Offline Demo
@@ -53,11 +54,13 @@ VDM research
 python3 scripts/vdm.py --project /tmp/nexttake-demo creator-demo
 ```
 
-返回的 `studio` 是静态 HTML 绝对路径。Discover 使用 2026-07-15 真实团播试点的脱敏 Evidence；发布和表现是固定演示数据，页面必须保留清晰的“演示数据”标记。
+返回的 `studio` 是静态 HTML 绝对路径。Discover 使用真实团播试点的脱敏 Evidence；发布和表现是固定演示数据，页面必须保留清晰的“演示数据”标记。
 
-## Evidence To Creator Project
+## Creator Project
 
-使用者必须先在 creator project 中运行原生 `cheat-init`。NextTake 不自行创建 `.cheat-state.json`。
+真实使用前，先在创作者目录执行“初始化创作者项目”。初始化由 NextTake 路由到内部内容实验引擎，使用者不需要知道或调用内部工作流名称。
+
+研究项目已经形成内容机会后运行：
 
 ```bash
 python3 scripts/vdm.py --project <research-project> content-prepare \
@@ -65,20 +68,19 @@ python3 scripts/vdm.py --project <research-project> content-prepare \
   --creator-project <creator-project>
 ```
 
-该命令只做薄桥接：
+该命令会：
 
-- 读取最新成功的 `analysis.cluster_score`；
-- 验证 Cluster 和 Evidence 白名单；
-- 创建不可变 `content.opportunity` Artifact；
-- 按上游 candidate schema 写 `candidates.md`；
-- 写 `.nexttake/sources/<candidate-id>.json/.md`；
-- 返回调用原生 `cheat-seed` 的下一步指令。
+- 读取最新成功的需求聚类；
+- 验证内容机会和 Evidence；
+- 创建不可变内容机会 Artifact；
+- 写入创作者候选池和 `.nexttake/sources/` source pack；
+- 返回公开动作 `generate_current_draft`。
 
-收到 source pack 后，读取并执行 `cheat-seed/SKILL.md`。生成稿仍写到上游规定的 `scripts/`；后续 score/predict/shoot/publish/retro 同理。
+随后按公开动作依次生成本期文案、完成发布前判断、登记人工发布并复盘。推荐下一条后，再执行“生成下一期文案”。
 
 ## Attach And Studio
 
-原生生命周期完成后，用 `creator-attach` 只登记已有文件路径，并导入无身份字段的原始表现 JSON：
+创作生命周期完成后登记已有文件：
 
 ```bash
 python3 scripts/vdm.py --project <research-project> creator-attach \
@@ -93,9 +95,7 @@ python3 scripts/vdm.py --project <research-project> creator-attach \
   --next-script-path scripts/<next-draft>.md
 ```
 
-运行 `cheat-recommend` 得到下一条方向后，继续读取并执行 `cheat-seed/SKILL.md` 生成下一期 draft，再通过 `--next-script-path` 一并登记。完整 Studio 必须同时展示本期文案和下一期文案。
-
-然后：
+生成只读 Studio：
 
 ```bash
 python3 scripts/vdm.py --project <research-project> creator-studio \
@@ -103,11 +103,11 @@ python3 scripts/vdm.py --project <research-project> creator-studio \
   --candidate-id <id>
 ```
 
-Creator Studio 是只读静态页面。所有模型文本、评论和用户输入必须 escape；预测段 hash 不得因 Retro 追加而变化。
+完整 Studio 必须同时展示本期文案和下一期文案。所有模型文本、评论和用户输入必须 escape；预测段 hash 不得因复盘追加而变化。
 
-## VDM Evidence Workflow
+## Evidence Workflow
 
-需要真实同赛道研究时，继续使用现有流程：
+需要真实同赛道研究时使用现有流程：
 
 ```text
 init -> creator-add -> sync -> sample -> acquire
@@ -119,12 +119,12 @@ init -> creator-add -> sync -> sample -> acquire
 关键纪律：
 
 - Provider 采集和模型 Evidence 提取分离；
+- 真实 Provider 操作默认串行，并在操作之间使用项目级 `6-12` 秒随机缓冲；
+- B站每次只同步一个账号且只允许 `sync --pages 1`，其他账号必须在前一命令结束后单独同步；
 - 转录与评论 ModelJob 通道隔离；
 - `quote_snippet` 必须是白名单来源的逐字子串；
-- Demand Cluster 只是内容机会假设，不证明市场或流量；
+- 内容机会只是待验证假设，不证明市场或流量；
 - 遇到登录失效、验证码、风控或协议漂移时停止并保留检查点，不绕过验证。
-
-详细 Provider、ASR、恢复和验收契约见 `references/local-environment-setup.md` 及现有 CLI 帮助。
 
 ## Local Environment
 
@@ -134,19 +134,13 @@ init -> creator-add -> sync -> sample -> acquire
 python3 scripts/setup_local_environment.py --project <path>
 ```
 
-安装器默认使用仓库内固定版本：
-
-```text
-vendor/cheat-on-content/adapters/perf-data/douyin-session
-```
-
-可通过 `VDM_CHEAT_ROOT` 或 `VDM_CHEAT_DOUYIN_ADAPTER_DIR` 覆盖。浏览器 Profile、Cookie 和登录态必须留在仓库外。
+浏览器 Profile、Cookie 和登录态必须留在仓库外。公开参数使用 `--douyin-adapter-dir`，不得向使用者推荐内部兼容参数或内部环境变量。
 
 ## Capability Honesty
 
-- `preserved`：源码完整存在；
+- `preserved`：内部引擎源码存在；
 - `validated`：当前仓库测试已覆盖；
-- `exposed`：根 Skill 或 CLI 已接入；
+- `exposed`：已通过 NextTake 公开动作或 CLI 接入；
 - `demoed`：离线演示主路径实际展示。
 
-不要把 preserved 说成所有外部 Adapter 已端到端验证。查看 `references/cheat-on-content-integration.md` 获取完整矩阵。
+不要把源码保留说成所有外部 Adapter 已端到端验证。内部能力矩阵见 `references/internal-content-engine.md`。

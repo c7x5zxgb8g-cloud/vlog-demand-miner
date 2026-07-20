@@ -39,8 +39,12 @@ except ImportError:
 SCHEMA_VERSION = "1.0.0"
 VIDEO_ID = re.compile(r"/video/(\d+)")
 SKILL_ROOT = Path(__file__).resolve().parents[2]
-VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
-DEFAULT_UPSTREAM_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
+CONTENT_ENGINE_ROOT = Path(
+    os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
+    or os.getenv("VDM_CHEAT_ROOT")
+    or str(SKILL_ROOT / "vendor" / "content-engine")
+).expanduser().resolve()
+DEFAULT_UPSTREAM_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
 
 
 class UpstreamAdapterUnavailable(RuntimeError):
@@ -48,9 +52,14 @@ class UpstreamAdapterUnavailable(RuntimeError):
 
 
 def upstream_adapter_dir(value: str | Path | None) -> Path:
-    selected = Path(value or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or DEFAULT_UPSTREAM_ADAPTER).expanduser().resolve()
+    selected = Path(
+        value
+        or os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR")
+        or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR")
+        or DEFAULT_UPSTREAM_ADAPTER
+    ).expanduser().resolve()
     if not (selected / "crawler.py").is_file():
-        raise UpstreamAdapterUnavailable("cheat_douyin_session_adapter_unavailable")
+        raise UpstreamAdapterUnavailable("douyin_adapter_unavailable")
     return selected
 
 
@@ -63,14 +72,14 @@ def load_upstream_crawler(adapter_dir: Path) -> Any:
     try:
         spec = importlib.util.spec_from_file_location(module_name, adapter_dir / "crawler.py")
         if not spec or not spec.loader:
-            raise UpstreamAdapterUnavailable("cheat_douyin_session_adapter_unavailable")
+            raise UpstreamAdapterUnavailable("douyin_adapter_unavailable")
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
         return module
     except (ImportError, OSError) as exc:
         sys.modules.pop(module_name, None)
-        raise UpstreamAdapterUnavailable("cheat_douyin_session_adapter_unavailable") from exc
+        raise UpstreamAdapterUnavailable("douyin_adapter_unavailable") from exc
     finally:
         sys.path.pop(0)
         sys.modules.pop("paths", None)
@@ -320,7 +329,7 @@ async def main(args: argparse.Namespace) -> int:
             emit("ok", await healthcheck(args.profile_dir, args.upstream_adapter_dir))
             return 0
         except UpstreamAdapterUnavailable:
-            emit("blocked_browser_unavailable", warnings=["cheat_douyin_session_adapter_unavailable"])
+            emit("blocked_browser_unavailable", warnings=["douyin_adapter_unavailable"])
             return 2
         except PlaywrightError:
             emit("blocked_browser_unavailable")
@@ -355,7 +364,7 @@ async def main(args: argparse.Namespace) -> int:
             emit(overall, {"operations": results, "provider_mode": "browser"})
             return 0 if overall == "ok" else 2
     except UpstreamAdapterUnavailable:
-        emit("blocked_browser_unavailable", warnings=["cheat_douyin_session_adapter_unavailable"])
+        emit("blocked_browser_unavailable", warnings=["douyin_adapter_unavailable"])
         return 2
     except PlaywrightError as exc:
         emit("blocked_browser_unavailable", error={"type": type(exc).__name__})
@@ -365,7 +374,8 @@ async def main(args: argparse.Namespace) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile-dir", type=Path, required=True)
-    parser.add_argument("--upstream-adapter-dir", type=Path, default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(DEFAULT_UPSTREAM_ADAPTER)))
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or str(DEFAULT_UPSTREAM_ADAPTER)
+    parser.add_argument("--upstream-adapter-dir", type=Path, default=adapter_default)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--commenter-hmac-key-env")
     commands = parser.add_subparsers(dest="command", required=True)

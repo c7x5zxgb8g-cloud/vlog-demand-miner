@@ -12,7 +12,7 @@ Run from the installed Skill directory. The command is idempotent and installs o
 python3 scripts/setup_local_environment.py --project /absolute/path/to/research-project
 ```
 
-It installs Homebrew `ffmpeg`, `whisper-cpp`, Python 3.12, a pinned `bilibili-cli`, a checksum-verified Whisper base model, a separate pinned Playwright runtime for the 抖音 Browser Provider, and a project-local commenter HMAC key in macOS Keychain. The Browser Provider directly bridges cheat-on-content's `douyin-session` adapter. The installer first uses the complete pinned source vendored at `vendor/cheat-on-content/`, then checks approved external installations, and only falls back to a managed checkout when neither is available. It returns the selected source, revision, executable paths, environment variables, and ordered `next_actions`; it never prints the HMAC value.
+It installs Homebrew `ffmpeg`, `whisper-cpp`, Python 3.12, a pinned `bilibili-cli`, a checksum-verified Whisper base model, a separate pinned Playwright runtime for the 抖音 Browser Provider, and a project-local commenter HMAC key in macOS Keychain. The Browser Provider uses NextTake's bundled content adapter. The installer first uses the fixed source under `vendor/content-engine/` and falls back to a managed pinned checkout only when the bundled copy is unavailable. It returns the selected revision, executable paths, public environment variables and ordered `next_actions`; it never prints the HMAC value.
 
 The upstream checkout and Browser virtual environment are idempotent. A matching pinned checkout is not fetched again, and a matching Browser runtime is not reinstalled. The script stops instead of overwriting a non-Git upstream directory or a managed checkout containing local edits.
 
@@ -37,14 +37,23 @@ After installation, run the returned executable interactively:
 /absolute/path/from-setup/bili login
 ```
 
-Ask the user to complete QR-code login and confirm completion. Then run `doctor` or a single `sync --pages 1` health check.
+Ask the user to complete QR-code login and confirm completion. Then run `doctor` or a single `sync --pages 1` health check. NextTake rejects larger page counts. Run one creator account at a time; provider operations and separate CLI processes share the project-level serial request gate, with a random `6-12` second delay after the previous operation completes.
 
 ### 抖音 Sidecar (preferred)
 
-The installer only checks `http://127.0.0.1:18080/openapi.json`. It intentionally does not build, start, configure, or inspect a Sidecar that may contain credentials. Use the organization-approved local Sidecar deployment and let the user complete its browser/login flow. Once the Sidecar is healthy, run:
+The installer only checks `http://127.0.0.1:18080/openapi.json`. It intentionally does not build, start, configure, or inspect a Sidecar that may contain credentials. Use the organization-approved local Sidecar deployment and let the user complete its browser/login flow. A running container is not sufficient evidence: require the NextTake health check to return `status: ok`. Once the Sidecar is healthy, run:
 
 ```bash
 python3 scripts/vdm.py --project /absolute/path/to/research-project doctor
+```
+
+For a known local deployment, explicitly select the Sidecar for the first one-page smoke sync:
+
+```bash
+python3 scripts/vdm.py --project /absolute/path/to/research-project \
+  --sidecar-url http://127.0.0.1:18080 \
+  --douyin-provider sidecar \
+  sync --creator-id "<creator-id>" --platform douyin --pages 1
 ```
 
 Treat `blocked_auth`, `blocked_verification`, `risk_control`, and `schema_drift` as a stop condition. Do not retry within the platform; preserve the checkpoint and use the approved Browser Provider or ask the user to refresh the Sidecar login.
@@ -66,14 +75,11 @@ Browser Provider reuses the upstream persistent browser session and passive XHR 
 Adapter discovery checks these locations in order:
 
 ```text
-<skill-root>/vendor/cheat-on-content/adapters/perf-data/douyin-session
-~/.cc-switch/skills/cheat-on-content/adapters/perf-data/douyin-session
-~/.codex/skills/cheat-on-content/adapters/perf-data/douyin-session
-~/.agents/skills/cheat-on-content/adapters/perf-data/douyin-session
-<state-dir>/upstreams/cheat-on-content/adapters/perf-data/douyin-session
+<skill-root>/vendor/content-engine/adapters/perf-data/douyin-session
+<state-dir>/upstreams/content-engine/adapters/perf-data/douyin-session
 ```
 
-The last path is installed automatically at the pinned `CHEAT_COMMIT` only when the vendored and approved external copies are absent. Set `VDM_CHEAT_ROOT` to select another complete source root, or set `VDM_CHEAT_DOUYIN_ADAPTER_DIR` / pass `--cheat-douyin-adapter-dir` for an explicit adapter path. The upstream adapter's creator-center inventory and private metrics are never used for competitor accounts; VDM only reuses its browser-session and public-video comment acquisition path.
+The managed path is installed automatically at the pinned engine revision only when the bundled copy is absent. Set `NEXTTAKE_CONTENT_ENGINE_ROOT` to select another complete source root, or set `NEXTTAKE_DOUYIN_ADAPTER_DIR` / pass `--douyin-adapter-dir` for an explicit adapter path. The adapter's creator-center inventory and private metrics are never used for competitor accounts; NextTake only uses its browser-session and public-video comment acquisition path.
 
 After setup, use the `environment` object exactly as returned, then execute the `next_actions` arrays in order. They include the absolute Browser Python, upstream adapter, persistent profile, B站 CLI, interactive login commands, project path, and final `doctor` command. Never convert or log a Keychain secret as part of this handoff.
 
@@ -107,3 +113,18 @@ python3 scripts/vdm.py --project /tmp/vdm-demo demo
 ```
 
 The environment is ready when ASR tools, B站 CLI, Keychain credential reference, and at least one 抖音 provider is ready: the local Sidecar or the Browser Provider runtime. Platform login remains a user-controlled state, not an installation result.
+
+## Acquisition Rate Policy
+
+Live `sync` and `acquire` commands submit Provider operations serially. The default random interval is `6-12` seconds between operation completions and the next operation start, persisted per research project so separate CLI processes cannot accidentally burst. Only platform name and completion time are stored; account identifiers, request parameters, Cookie and Token values are not written to the gate.
+
+Use a more conservative bounded interval when needed:
+
+```bash
+python3 scripts/vdm.py --project /absolute/path/to/research-project \
+  --request-delay-min-seconds 10 \
+  --request-delay-max-seconds 18 \
+  sync --creator-id "<creator-id>" --platform bilibili --pages 1
+```
+
+The bounds must be numeric and non-negative, with minimum no greater than maximum. Rate controls reduce accidental high frequency; they do not bypass risk control. Stop on authentication expiry, CAPTCHA, verification, `risk_control`, or schema drift.

@@ -58,11 +58,54 @@ def _inline(value: str) -> str:
     return safe
 
 
+def _table_cells(line: str) -> list[str]:
+    """Split one pipe table row while preserving escaped literal pipes."""
+    value = line.strip()
+    if value.startswith("|"):
+        value = value[1:]
+    if value.endswith("|") and not value.endswith(r"\|"):
+        value = value[:-1]
+    cells: list[str] = []
+    cell: list[str] = []
+    escaped = False
+    for char in value:
+        if escaped:
+            cell.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == "|":
+            cells.append("".join(cell).strip())
+            cell = []
+        else:
+            cell.append(char)
+    if escaped:
+        cell.append("\\")
+    cells.append("".join(cell).strip())
+    return cells
+
+
+def _table_alignments(line: str) -> list[str] | None:
+    cells = _table_cells(line)
+    if not cells or any(not re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells):
+        return None
+    alignments = []
+    for cell in cells:
+        marker = cell.replace(" ", "")
+        if marker.startswith(":") and marker.endswith(":"):
+            alignments.append("center")
+        elif marker.endswith(":"):
+            alignments.append("right")
+        else:
+            alignments.append("left")
+    return alignments
+
+
 def markdown_html(markdown: str) -> str:
     """Render a deliberately small, script-free Markdown subset."""
     output: list[str] = []
     paragraph: list[str] = []
-    in_list = False
+    list_tag: str | None = None
 
     def flush_paragraph() -> None:
         nonlocal paragraph
@@ -71,17 +114,45 @@ def markdown_html(markdown: str) -> str:
             paragraph = []
 
     def close_list() -> None:
-        nonlocal in_list
-        if in_list:
-            output.append("</ul>")
-            in_list = False
+        nonlocal list_tag
+        if list_tag:
+            output.append(f"</{list_tag}>")
+            list_tag = None
 
-    for raw in markdown.splitlines():
+    lines = markdown.splitlines()
+    index = 0
+    while index < len(lines):
+        raw = lines[index]
         line = raw.strip()
         if not line:
             flush_paragraph()
             close_list()
+            index += 1
             continue
+        if line.startswith("|") and index + 1 < len(lines):
+            alignments = _table_alignments(lines[index + 1].strip())
+            headers = _table_cells(line)
+            if alignments is not None and len(headers) == len(alignments):
+                flush_paragraph(); close_list()
+                head = "".join(
+                    f"<th class='align-{align}'>{_inline(cell)}</th>"
+                    for cell, align in zip(headers, alignments)
+                )
+                rows = []
+                index += 2
+                while index < len(lines) and lines[index].strip().startswith("|"):
+                    cells = _table_cells(lines[index])
+                    cells = (cells + [""] * len(headers))[:len(headers)]
+                    rows.append("<tr>" + "".join(
+                        f"<td class='align-{align}'>{_inline(cell)}</td>"
+                        for cell, align in zip(cells, alignments)
+                    ) + "</tr>")
+                    index += 1
+                output.append(
+                    "<div class='md-table-wrap'><table class='md-table'>"
+                    f"<thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+                )
+                continue
         if line.startswith("### "):
             flush_paragraph(); close_list(); output.append(f"<h4>{_inline(line[4:])}</h4>")
         elif line.startswith("## "):
@@ -90,15 +161,21 @@ def markdown_html(markdown: str) -> str:
             flush_paragraph(); close_list(); output.append(f"<h2>{_inline(line[2:])}</h2>")
         elif line.startswith("- "):
             flush_paragraph()
-            if not in_list:
-                output.append("<ul>"); in_list = True
+            if list_tag != "ul":
+                close_list(); output.append("<ul>"); list_tag = "ul"
             output.append(f"<li>{_inline(line[2:])}</li>")
+        elif match := re.match(r"^\d+\.\s+(.+)$", line):
+            flush_paragraph()
+            if list_tag != "ol":
+                close_list(); output.append("<ol>"); list_tag = "ol"
+            output.append(f"<li>{_inline(match.group(1))}</li>")
         elif line.startswith(">"):
             flush_paragraph(); close_list(); output.append(f"<blockquote>{_inline(line.lstrip('> ').strip())}</blockquote>")
         elif line == "---":
             flush_paragraph(); close_list(); output.append("<hr>")
         else:
             paragraph.append(line)
+        index += 1
     flush_paragraph(); close_list()
     return "".join(output)
 
@@ -234,7 +311,7 @@ def studio_html(payload: dict[str, Any]) -> str:
     script_text = escape(current_script)
     next_script_text = escape(next_script)
     css = """
-:root{color-scheme:light;--ink:#172027;--muted:#65727b;--line:#d8dee2;--paper:#ffffff;--wash:#f3f5f6;--red:#b42318;--green:#18794e;--blue:#175cd3;--yellow:#8a6100}*{box-sizing:border-box}html,body{max-width:100%;overflow-x:hidden}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:var(--ink);background:var(--paper);line-height:1.65}button,a{font:inherit}.shell{max-width:1180px;margin:auto;padding:0 24px}.masthead{border-bottom:1px solid var(--line);padding:28px 0 22px;background:#fff}.brand{display:flex;align-items:end;justify-content:space-between;gap:24px}.brand h1{font-size:32px;line-height:1;margin:0;letter-spacing:0}.brand p{margin:8px 0 0;color:var(--muted)}.demo{display:inline-block;padding:4px 8px;border:1px solid #f0b429;color:#6f4b00;background:#fff7d6;border-radius:4px;font-size:12px;font-weight:700}.nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line)}.nav .shell{display:flex;gap:4px;overflow:auto}.nav a{color:var(--ink);text-decoration:none;padding:13px 16px;border-bottom:3px solid transparent;white-space:nowrap}.nav a:hover,.nav a:focus{border-color:var(--red);outline:none}.band{padding:54px 0;border-bottom:1px solid var(--line)}.band.alt{background:var(--wash)}.section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:24px}.section-head h2{font-size:24px;margin:0}.section-head p{margin:0;color:var(--muted);max-width:660px}.opportunity-table{width:100%;border-collapse:collapse;background:#fff}.opportunity-table th,.opportunity-table td{text-align:left;padding:14px;border-bottom:1px solid var(--line);vertical-align:top}.opportunity-table th{font-size:12px;color:var(--muted);text-transform:uppercase}.opportunity-table td small{display:block;color:var(--muted)}.opportunity-table tr.selected{background:#fff3f1;box-shadow:inset 4px 0 var(--red)}.split{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:28px}.panel{border:1px solid var(--line);border-radius:6px;background:#fff;padding:22px;min-width:0;overflow-wrap:anywhere}.panel h3:first-child,.panel h2:first-child{margin-top:0}.evidence-list,.comment-list{list-style:none;padding:0;margin:0}.evidence-list li,.comment-list li{padding:14px 0;border-bottom:1px solid var(--line)}.evidence-list p,.comment-list p{margin:5px 0 0}.limitations{border-left:4px solid #d6a000;padding-left:18px}.limitations li{margin:8px 0}.copy{border:1px solid var(--line);background:#fff;padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:650}.copy:hover,.copy:focus{border-color:var(--blue);outline:2px solid #b9d1ff}.markdown h2{font-size:22px}.markdown h3{font-size:18px;margin-top:28px}.markdown h4{font-size:16px}.markdown blockquote{margin:16px 0;padding:12px 16px;border-left:4px solid var(--blue);background:#eef4ff}.markdown code{font-size:12px;color:#344054;overflow-wrap:anywhere}.metric-strip{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--line);background:#fff;margin-bottom:28px}.metric{padding:16px;border-right:1px solid var(--line);min-width:0}.metric:last-child{border-right:0}.metric span,.metric small{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:22px;margin:3px 0}.hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;overflow-wrap:anywhere;color:var(--muted)}footer{padding:28px 0;color:var(--muted);font-size:13px}@media(max-width:800px){.shell{padding:0 16px}.brand,.section-head{display:block}.demo{margin-top:14px}.band{padding:38px 0}.split{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,1fr)}.metric:nth-child(2n){border-right:0}.opportunity-table,.opportunity-table tbody,.opportunity-table tr,.opportunity-table td{display:block;width:100%}.opportunity-table thead{display:none}.opportunity-table tr{padding:14px 12px;border-bottom:1px solid var(--line)}.opportunity-table tr:last-child{border-bottom:0}.opportunity-table tr.selected{box-shadow:inset 4px 0 var(--red)}.opportunity-table td{border:0;padding:2px 8px}.opportunity-table td:first-child{font-size:12px;color:var(--muted)}.opportunity-table td:nth-child(3){margin-top:5px;font-size:13px;color:var(--muted)}.opportunity-table td:nth-child(3)::before{content:"需求分 ";font-weight:650}.opportunity-table td:nth-child(4),.opportunity-table td:nth-child(5){display:none}.section-head p{margin-top:8px}}
+:root{color-scheme:light;--ink:#172027;--muted:#65727b;--line:#d8dee2;--paper:#ffffff;--wash:#f3f5f6;--red:#b42318;--green:#18794e;--blue:#175cd3;--yellow:#8a6100}*{box-sizing:border-box}html,body{max-width:100%;overflow-x:hidden}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:var(--ink);background:var(--paper);line-height:1.65}button,a{font:inherit}.shell{max-width:1180px;margin:auto;padding:0 24px}.masthead{border-bottom:1px solid var(--line);padding:28px 0 22px;background:#fff}.brand{display:flex;align-items:end;justify-content:space-between;gap:24px}.brand h1{font-size:32px;line-height:1;margin:0;letter-spacing:0}.brand p{margin:8px 0 0;color:var(--muted)}.demo{display:inline-block;padding:4px 8px;border:1px solid #f0b429;color:#6f4b00;background:#fff7d6;border-radius:4px;font-size:12px;font-weight:700}.nav{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line)}.nav .shell{display:flex;gap:4px;overflow:auto}.nav a{color:var(--ink);text-decoration:none;padding:13px 16px;border-bottom:3px solid transparent;white-space:nowrap}.nav a:hover,.nav a:focus{border-color:var(--red);outline:none}.band{padding:54px 0;border-bottom:1px solid var(--line)}.band.alt{background:var(--wash)}.section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:24px}.section-head h2{font-size:24px;margin:0}.section-head p{margin:0;color:var(--muted);max-width:660px}.opportunity-table{width:100%;border-collapse:collapse;background:#fff}.opportunity-table th,.opportunity-table td{text-align:left;padding:14px;border-bottom:1px solid var(--line);vertical-align:top}.opportunity-table th{font-size:12px;color:var(--muted);text-transform:uppercase}.opportunity-table td small{display:block;color:var(--muted)}.opportunity-table tr.selected{background:#fff3f1;box-shadow:inset 4px 0 var(--red)}.split{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:28px}.panel{border:1px solid var(--line);border-radius:6px;background:#fff;padding:22px;min-width:0;overflow-wrap:anywhere}.panel h3:first-child,.panel h2:first-child{margin-top:0}.evidence-list,.comment-list{list-style:none;padding:0;margin:0}.evidence-list li,.comment-list li{padding:14px 0;border-bottom:1px solid var(--line)}.evidence-list p,.comment-list p{margin:5px 0 0}.limitations{border-left:4px solid #d6a000;padding-left:18px}.limitations li{margin:8px 0}.copy{border:1px solid var(--line);background:#fff;padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:650}.copy:hover,.copy:focus{border-color:var(--blue);outline:2px solid #b9d1ff}.markdown h2{font-size:22px}.markdown h3{font-size:18px;margin-top:28px}.markdown h4{font-size:16px}.markdown blockquote{margin:16px 0;padding:12px 16px;border-left:4px solid var(--blue);background:#eef4ff}.markdown code{font-size:12px;color:#344054;overflow-wrap:anywhere}.markdown ul,.markdown ol{padding-left:1.4rem}.markdown li{margin:7px 0}.md-table-wrap{max-width:100%;overflow-x:auto;margin:16px 0}.md-table{width:100%;border-collapse:collapse;font-size:14px}.md-table th,.md-table td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top;min-width:92px}.md-table th{background:var(--wash);font-weight:700}.md-table .align-center{text-align:center}.md-table .align-right{text-align:right;font-variant-numeric:tabular-nums}.metric-strip{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--line);background:#fff;margin-bottom:28px}.metric{padding:16px;border-right:1px solid var(--line);min-width:0}.metric:last-child{border-right:0}.metric span,.metric small{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;font-size:22px;margin:3px 0}.hash{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;overflow-wrap:anywhere;color:var(--muted)}footer{padding:28px 0;color:var(--muted);font-size:13px}@media(max-width:800px){.shell{padding:0 16px}.brand,.section-head{display:block}.demo{margin-top:14px}.band{padding:38px 0}.split{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,1fr)}.metric:nth-child(2n){border-right:0}.opportunity-table,.opportunity-table tbody,.opportunity-table tr,.opportunity-table td{display:block;width:100%}.opportunity-table thead{display:none}.opportunity-table tr{padding:14px 12px;border-bottom:1px solid var(--line)}.opportunity-table tr:last-child{border-bottom:0}.opportunity-table tr.selected{box-shadow:inset 4px 0 var(--red)}.opportunity-table td{border:0;padding:2px 8px}.opportunity-table td:first-child{font-size:12px;color:var(--muted)}.opportunity-table td:nth-child(3){margin-top:5px;font-size:13px;color:var(--muted)}.opportunity-table td:nth-child(3)::before{content:"需求分 ";font-weight:650}.opportunity-table td:nth-child(4),.opportunity-table td:nth-child(5){display:none}.section-head p{margin-top:8px}}
 """
     js = """
 document.querySelectorAll('[data-copy]').forEach(function(button){button.addEventListener('click',function(){var target=document.getElementById(button.dataset.copy);var label=button.dataset.label;navigator.clipboard.writeText(target.textContent).then(function(){button.textContent='已复制';setTimeout(function(){button.textContent=label},1400)})})});
@@ -243,7 +320,7 @@ document.querySelectorAll('[data-copy]').forEach(function(button){button.addEven
 <header class='masthead'><div class='shell brand'><div><h1>下一条 NextTake</h1><p>让上一条，决定下一条。</p></div>{demo_label}</div></header>
 <nav class='nav'><div class='shell'><a href='#discover'>发现</a><a href='#create'>创作</a><a href='#learn'>复盘</a><a href='#next'>下一条</a></div></nav>
 <main>
-<section id='discover' class='band alt'><div class='shell'><div class='section-head'><div><h2>发现：从真实问题开始</h2><p>团播试点的 4 个内容机会。红色行是本次创作主题，需求分用于比较当前信号强弱，不代表流量承诺。</p></div></div><div class='panel'><table class='opportunity-table'><thead><tr><th>#</th><th>受众问题</th><th>需求分</th></tr></thead><tbody>{opportunity_rows}</tbody></table></div><div class='split' style='margin-top:28px'><div class='panel'><h3>观众原话</h3><ul class='evidence-list'>{evidence}</ul></div><aside class='panel limitations'><h3>使用时注意</h3><ul>{limitations}</ul></aside></div></div></section>
+<section id='discover' class='band alt'><div class='shell'><div class='section-head'><div><h2>发现：从真实问题开始</h2><p>本次研究共发现 {len(payload['opportunities'])} 个内容机会。红色行是本次创作主题，需求分用于比较当前信号强弱，不代表流量承诺。</p></div></div><div class='panel'><table class='opportunity-table'><thead><tr><th>#</th><th>受众问题</th><th>需求分</th></tr></thead><tbody>{opportunity_rows}</tbody></table></div><div class='split' style='margin-top:28px'><div class='panel'><h3>观众原话</h3><ul class='evidence-list'>{evidence}</ul></div><aside class='panel limitations'><h3>使用时注意</h3><ul>{limitations}</ul></aside></div></div></section>
 <section id='create' class='band'><div class='shell'><div class='section-head'><div><h2>本期文案</h2></div><button class='copy' data-copy='script-source' data-label='复制本期文案'>复制本期文案</button></div><div class='split'><article class='panel markdown'>{markdown_html(current_script)}</article><aside class='panel markdown'>{markdown_html(current_prediction)}</aside></div><pre id='script-source' hidden>{script_text}</pre></div></section>
 <section id='learn' class='band alt'><div class='shell'><div class='section-head'><div><h2>本期复盘</h2><p>哪些判断成立、哪些需要调整，以及观众真正继续追问了什么。</p></div>{demo_label}</div><div class='metric-strip'>{metrics}</div><div class='split'><article class='panel markdown'>{markdown_html(report_markdown)}</article><aside class='panel'><h3>观众评论</h3><ul class='comment-list'>{comments}</ul></aside></div><div class='panel markdown' style='margin-top:28px'><h2>受众变化</h2>{markdown_html(audience_markdown)}</div></div></section>
 <section id='next' class='band'><div class='shell'><div class='section-head'><div><h2>下一条</h2><p>根据本期表现和评论，继续生成可以直接修改和拍摄的下一期内容。</p></div><button class='copy' data-copy='next-script-source' data-label='复制下一期文案'>复制下一期文案</button></div><div class='split'><article class='panel markdown'>{markdown_html(recommendation_markdown)}</article><aside class='panel markdown'><h2>下一期文案</h2>{markdown_html(next_script)}</aside></div><pre id='next-script-source' hidden>{next_script_text}</pre></div></section>

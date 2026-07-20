@@ -7,9 +7,12 @@ own acquisition, and are always invoked serially within their platform.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
+import math
 import os
+import random
 import sqlite3
 import subprocess
 import sys
@@ -17,7 +20,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import analysis
 import content
@@ -37,10 +40,17 @@ DOUYIN_FALLBACK_STATUSES = {
     "blocked_auth", "blocked_verification", "risk_control", "schema_drift",
     "anomalous_empty_result",
 }
-DOUYIN_PROVIDER_REVISION = "cheat-douyin-session-v4"
+DOUYIN_PROVIDER_REVISION = "nexttake-douyin-browser-v1"
+ACQUISITION_POLICY_REVISION = "serial-low-page-jitter-v1"
+DEFAULT_REQUEST_DELAY_MIN_SECONDS = 6.0
+DEFAULT_REQUEST_DELAY_MAX_SECONDS = 12.0
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-VENDORED_CHEAT_ROOT = Path(os.getenv("VDM_CHEAT_ROOT", str(SKILL_ROOT / "vendor" / "cheat-on-content"))).expanduser().resolve()
-VENDORED_DOUYIN_ADAPTER = VENDORED_CHEAT_ROOT / "adapters" / "perf-data" / "douyin-session"
+CONTENT_ENGINE_ROOT = Path(
+    os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
+    or os.getenv("VDM_CHEAT_ROOT")
+    or str(SKILL_ROOT / "vendor" / "content-engine")
+).expanduser().resolve()
+VENDORED_DOUYIN_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
 
 
 def now() -> int: return int(time.time())
@@ -247,7 +257,10 @@ def do_content_prepare(project: Path, db: sqlite3.Connection, cluster_id: str, c
     except creator_flow.CreatorFlowError as exc:
         return {
             "status": "invalid_input", "error": str(exc), "artifact": capture,
-            "next_action": "Run the vendored cheat-init skill in the creator project, then repeat content-prepare.",
+            "next_action": {
+                "action": "initialize_creator_project",
+                "instruction": "在创作者目录中使用 NextTake 初始化创作者项目，然后重新运行 content-prepare。",
+            },
         }
     return {"status": "reused" if row["status"] == "succeeded" else "ok", "artifact": capture, "cluster_id": cluster_id, **written}
 
@@ -296,7 +309,11 @@ def do_creator_demo(project: Path) -> dict[str, Any]:
             "product": "下一条 NextTake",
             "notice": "Discover uses desensitized pilot evidence. Publication and performance are explicitly labeled demo data.",
             "opportunities": 4,
-            "native_lifecycle": ["cheat-seed", "cheat-score", "cheat-predict", "cheat-shoot", "cheat-publish", "cheat-retro", "cheat-persona", "cheat-recommend"],
+            "workflow_stages": [
+                "generate_current_draft", "score_draft", "pre_publish_prediction",
+                "register_shoot", "register_manual_publish", "retro",
+                "update_audience", "recommend_next", "generate_next_draft",
+            ],
         })
     return result
 
@@ -507,6 +524,119 @@ def invoke_provider(command: list[str], plan: Path) -> dict[str, Any]:
         return {"status": "provider_protocol_error", "data": None}
 
 
+def request_delay_bounds(args: argparse.Namespace) -> tuple[float, float]:
+    try:
+        minimum = float(getattr(args, "request_delay_min_seconds", DEFAULT_REQUEST_DELAY_MIN_SECONDS))
+        maximum = float(getattr(args, "request_delay_max_seconds", DEFAULT_REQUEST_DELAY_MAX_SECONDS))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("request_delay_must_be_numeric") from exc
+    if not math.isfinite(minimum) or not math.isfinite(maximum) or minimum < 0 or maximum < minimum:
+        raise ValueError("request_delay_range_invalid")
+    return minimum, maximum
+
+
+def acquisition_policy(args: argparse.Namespace, platform: str) -> dict[str, Any]:
+    minimum, maximum = request_delay_bounds(args)
+    return {
+        "revision": ACQUISITION_POLICY_REVISION,
+        "execution": "serial",
+        "request_delay_seconds": {"min": minimum, "max": maximum},
+        "sync_page_limit": 1 if platform == "bilibili" else None,
+    }
+
+
+def _read_request_gate(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"revision": ACQUISITION_POLICY_REVISION, "platforms": {}}
+    if not isinstance(payload, dict) or not isinstance(payload.get("platforms"), dict):
+        return {"revision": ACQUISITION_POLICY_REVISION, "platforms": {}}
+    return payload
+
+
+def _write_request_gate(path: Path, payload: dict[str, Any]) -> None:
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(dump(payload), encoding="utf-8")
+    temporary.replace(path)
+
+
+def invoke_provider_serialized(
+    project: Path,
+    platform: str,
+    command: list[str],
+    operation: dict[str, Any],
+    delay_bounds: tuple[float, float],
+    *,
+    clock: Callable[[], float] = time.time,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter: Callable[[float, float], float] = random.uniform,
+) -> dict[str, Any]:
+    """Run one provider operation under a project-wide persistent request gate."""
+    root, _, _ = paths(project)
+    root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / "provider-request-gate.lock"
+    state_path = root / "provider-request-gate.json"
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        state = _read_request_gate(state_path)
+        platform_state = state["platforms"].get(platform)
+        last_completed = platform_state.get("last_completed_at") if isinstance(platform_state, dict) else None
+        if isinstance(last_completed, (int, float)):
+            delay = jitter(*delay_bounds)
+            remaining = float(last_completed) + delay - clock()
+            if remaining > 0:
+                sleeper(remaining)
+        with tempfile.NamedTemporaryFile("w", suffix=".json", dir=root, delete=False, encoding="utf-8") as handle:
+            json.dump({"operations": [operation]}, handle)
+            plan = Path(handle.name)
+        try:
+            return invoke_provider(command, plan)
+        finally:
+            plan.unlink(missing_ok=True)
+            state["revision"] = ACQUISITION_POLICY_REVISION
+            state["platforms"][platform] = {"last_completed_at": clock()}
+            _write_request_gate(state_path, state)
+
+
+def _combine_provider_responses(responses: list[dict[str, Any]]) -> dict[str, Any]:
+    operations: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    envelope_failed = False
+    for response in responses:
+        envelope_failed = envelope_failed or response.get("status") != "ok"
+        for warning in response.get("warnings") or []:
+            if isinstance(warning, str) and warning not in warnings:
+                warnings.append(warning)
+        data = response.get("data")
+        result_items = data.get("operations") if isinstance(data, dict) else None
+        if isinstance(result_items, list):
+            operations.extend(item for item in result_items if isinstance(item, dict))
+        elif response.get("status"):
+            operations.append({"status": str(response["status"])})
+    operation_failed = not operations or any(item.get("status") != "ok" for item in operations)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "status": "partial" if envelope_failed or operation_failed else "ok",
+        "data": {"operations": operations},
+        "warnings": warnings,
+    }
+
+
+def invoke_operations_serially(
+    project: Path,
+    platform: str,
+    command: list[str],
+    operations: list[dict[str, Any]],
+    delay_bounds: tuple[float, float],
+) -> dict[str, Any]:
+    responses = [
+        invoke_provider_serialized(project, platform, command, operation, delay_bounds)
+        for operation in operations
+    ]
+    return _combine_provider_responses(responses)
+
+
 def browser_profile(project: Path, args: argparse.Namespace) -> Path:
     profile = Path(args.douyin_browser_profile_dir).expanduser().resolve()
     root, _, _ = paths(project)
@@ -519,7 +649,7 @@ def browser_profile(project: Path, args: argparse.Namespace) -> Path:
 
 def browser_provider_command(project: Path, args: argparse.Namespace) -> list[str]:
     command = [args.douyin_browser_python, str(DOUYIN_BROWSER_PROVIDER), "--profile-dir", str(browser_profile(project, args)),
-               "--upstream-adapter-dir", str(getattr(args, "cheat_douyin_adapter_dir", os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", "")))]
+               "--upstream-adapter-dir", str(getattr(args, "douyin_adapter_dir", ""))]
     if args.commenter_hmac_key_env:
         command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
     return command
@@ -530,38 +660,51 @@ def run_provider(project: Path, platform: str, args: argparse.Namespace, operati
     if not provider:
         return {"status": "unsupported", "data": None}
     root, _, _ = paths(project)
-    with tempfile.NamedTemporaryFile("w", suffix=".json", dir=root, delete=False, encoding="utf-8") as handle:
-        json.dump({"operations": operations}, handle)
-        plan = Path(handle.name)
     try:
+        delay_bounds = request_delay_bounds(args)
         if platform == "bilibili":
             command = [sys.executable, str(provider), "--bilibili-cli", args.bilibili_cli, "--media-dir", str(root / "media")]
             if args.commenter_hmac_key_env:
                 command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
-            return invoke_provider(command, plan)
+            return invoke_operations_serially(project, platform, command, operations, delay_bounds)
         if args.douyin_provider == "browser":
             command = browser_provider_command(project, args)
-            response = invoke_provider(command, plan)
+            response = invoke_operations_serially(project, platform, command, operations, delay_bounds)
             response["provider_selection"] = {"requested": "browser", "selected": "browser"}
             return response
         command = [sys.executable, str(provider), "--sidecar-url", args.sidecar_url, "--media-dir", str(root / "media")]
         if args.commenter_hmac_key_env:
             command += ["--commenter-hmac-key-env", args.commenter_hmac_key_env]
-        response = invoke_provider(command, plan)
         if args.douyin_provider == "sidecar":
+            response = invoke_operations_serially(project, platform, command, operations, delay_bounds)
             response["provider_selection"] = {"requested": "sidecar", "selected": "sidecar"}
             return response
-        failed = response_operation_statuses(response)
-        if response.get("status") == "provider_protocol_error" or failed.intersection(DOUYIN_FALLBACK_STATUSES):
-            fallback = invoke_provider(browser_provider_command(project, args), plan)
-            fallback["provider_selection"] = {"requested": "auto", "selected": "browser", "fallback_from": "sidecar", "reason": sorted(failed.intersection(DOUYIN_FALLBACK_STATUSES)) or ["provider_protocol_error"]}
-            return fallback
-        response["provider_selection"] = {"requested": "auto", "selected": "sidecar"}
-        return response
+        responses: list[dict[str, Any]] = []
+        fallback_reasons: set[str] = set()
+        using_browser = False
+        browser_command: list[str] | None = None
+        for operation in operations:
+            selected_command = browser_command if using_browser else command
+            response = invoke_provider_serialized(project, platform, selected_command or command, operation, delay_bounds)
+            failed = response_operation_statuses(response)
+            should_fallback = not using_browser and (
+                response.get("status") == "provider_protocol_error"
+                or bool(failed.intersection(DOUYIN_FALLBACK_STATUSES))
+            )
+            if should_fallback:
+                fallback_reasons.update(failed.intersection(DOUYIN_FALLBACK_STATUSES) or {"provider_protocol_error"})
+                browser_command = browser_provider_command(project, args)
+                response = invoke_provider_serialized(project, platform, browser_command, operation, delay_bounds)
+                using_browser = True
+            responses.append(response)
+        combined = _combine_provider_responses(responses)
+        if using_browser:
+            combined["provider_selection"] = {"requested": "auto", "selected": "browser", "fallback_from": "sidecar", "reason": sorted(fallback_reasons)}
+        else:
+            combined["provider_selection"] = {"requested": "auto", "selected": "sidecar"}
+        return combined
     except ValueError as exc:
         return {"status": "invalid_input", "error": str(exc), "data": None}
-    finally:
-        plan.unlink(missing_ok=True)
 
 
 def one_account(db: sqlite3.Connection, creator_id: str, platform: str | None) -> sqlite3.Row | None:
@@ -578,8 +721,16 @@ def do_sync(project: Path, db: sqlite3.Connection, creator_id: str, pages: int, 
     if not account:
         return {"status": "invalid_input", "error": "exactly_one_matching_platform_account_required"}
     platform = account["platform"]
-    revision = f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli"
-    inputs = {"creator_id": creator_id, "pages": pages, "platform": platform, "provider": f"{platform}-bridge", "provider_mode": args.douyin_provider if platform == "douyin" else "cli", "provider_revision": revision}
+    if pages < 1:
+        return {"status": "invalid_input", "error": "sync_pages_must_be_positive"}
+    if platform == "bilibili" and pages != 1:
+        return {"status": "invalid_input", "error": "bilibili_sync_requires_single_page"}
+    try:
+        policy = acquisition_policy(args, platform)
+    except ValueError as exc:
+        return {"status": "invalid_input", "error": str(exc)}
+    revision = f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli"
+    inputs = {"creator_id": creator_id, "pages": pages, "platform": platform, "provider": f"{platform}-bridge", "provider_mode": args.douyin_provider if platform == "douyin" else "cli", "provider_revision": revision, "acquisition_policy": policy}
     row = task(db, "sync", creator_id, inputs)
     if row["status"] == "succeeded": return {"status": "reused", "task_id": row["id"]}
     db.execute("UPDATE tasks SET status='running',attempts=attempts+1,updated_at=? WHERE id=?", (now(), row["id"])); db.commit()
@@ -597,7 +748,10 @@ def do_sync(project: Path, db: sqlite3.Connection, creator_id: str, pages: int, 
     for post in result["posts"]:
         db.execute("INSERT INTO posts VALUES (?,?,?,?,?,?,?,?,0) ON CONFLICT(platform,platform_post_id) DO UPDATE SET creator_id=excluded.creator_id,title=excluded.title,published_at=excluded.published_at,content_type=excluded.content_type,metrics_json=excluded.metrics_json", (jid(), creator_id, platform, post["post_id"], post["title"], post.get("published_at"), post["content_type"], dump(post["public_metrics"])))
     db.execute("UPDATE tasks SET status='succeeded',artifact_hash=?,error_code=NULL,updated_at=? WHERE id=?", (capture, now(), row["id"])); db.commit()
-    return {"status": "ok", "task_id": row["id"], "platform": platform, "posts": len(result["posts"]), "coverage": result["coverage"], "warnings": result.get("warnings", [])}
+    warnings = list(result.get("warnings", []))
+    if "serial_low_page_jitter_enabled" not in warnings:
+        warnings.append("serial_low_page_jitter_enabled")
+    return {"status": "ok", "task_id": row["id"], "platform": platform, "posts": len(result["posts"]), "coverage": result["coverage"], "warnings": warnings, "acquisition_policy": policy}
 
 
 def commenter_identity_mode(args: argparse.Namespace) -> str:
@@ -610,14 +764,19 @@ def do_acquire(project: Path, db: sqlite3.Connection, post_id: str, args: argpar
     post = db.execute("SELECT * FROM posts WHERE id=?", (post_id,)).fetchone()
     if not post: return {"status": "invalid_input", "error": "post_not_found"}
     platform = post["platform"]
+    try:
+        policy = acquisition_policy(args, platform)
+    except ValueError as exc:
+        return {"status": "invalid_input", "error": str(exc)}
     inputs = {
         "post_id": post_id,
         "media": media,
         "platform": platform,
         "provider": f"{platform}-bridge",
         "provider_mode": args.douyin_provider if platform == "douyin" else "cli",
-        "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.cheat_douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
+        "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
         "commenter_identity_mode": commenter_identity_mode(args),
+        "acquisition_policy": policy,
     }
     row = task(db, "acquire", post_id, inputs)
     if row["status"] == "succeeded": return {"status": "reused", "task_id": row["id"]}
@@ -635,7 +794,7 @@ def do_acquire(project: Path, db: sqlite3.Connection, post_id: str, args: argpar
     capture = artifact(project, db, f"{platform}.acquire", response)
     status = response.get("status")
     db.execute("UPDATE tasks SET status=?,artifact_hash=?,error_code=?,updated_at=? WHERE id=?", ("succeeded" if status == "ok" else status, capture, None if status == "ok" else status, now(), row["id"])); db.commit()
-    return {"status": status, "task_id": row["id"], "platform": platform, "artifact": capture}
+    return {"status": status, "task_id": row["id"], "platform": platform, "artifact": capture, "acquisition_policy": policy}
 
 
 def main(args: argparse.Namespace) -> int:
@@ -711,9 +870,15 @@ if __name__ == "__main__":
     parser.add_argument("--douyin-provider", choices=["auto", "sidecar", "browser"], default=os.getenv("VDM_DOUYIN_PROVIDER", "auto"))
     parser.add_argument("--douyin-browser-python", default=os.getenv("VDM_DOUYIN_BROWSER_PYTHON", sys.executable))
     parser.add_argument("--douyin-browser-profile-dir", default=os.getenv("VDM_DOUYIN_BROWSER_PROFILE_DIR", "~/.local/share/vlog-demand-miner/browser-profiles/douyin"))
-    parser.add_argument("--cheat-douyin-adapter-dir", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR", str(VENDORED_DOUYIN_ADAPTER)))
-    parser.add_argument("--cheat-douyin-adapter-revision", default=os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION", "unversioned"))
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or str(VENDORED_DOUYIN_ADAPTER)
+    revision_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_REVISION") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION") or "bundled"
+    parser.add_argument("--douyin-adapter-dir", dest="douyin_adapter_dir", default=adapter_default)
+    parser.add_argument("--douyin-adapter-revision", dest="douyin_adapter_revision", default=revision_default)
+    parser.add_argument("--cheat-douyin-adapter-dir", dest="douyin_adapter_dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    parser.add_argument("--cheat-douyin-adapter-revision", dest="douyin_adapter_revision", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     parser.add_argument("--commenter-hmac-key-env")
+    parser.add_argument("--request-delay-min-seconds", default=os.getenv("VDM_REQUEST_DELAY_MIN_SECONDS", str(DEFAULT_REQUEST_DELAY_MIN_SECONDS)))
+    parser.add_argument("--request-delay-max-seconds", default=os.getenv("VDM_REQUEST_DELAY_MAX_SECONDS", str(DEFAULT_REQUEST_DELAY_MAX_SECONDS)))
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init"); init.add_argument("--name", required=True)
     add = commands.add_parser("creator-add"); add.add_argument("--name", required=True); add.add_argument("--platform", choices=sorted(PROVIDERS), default="douyin"); add.add_argument("--account-id"); add.add_argument("--sec-user-id"); add.add_argument("--credential-ref")

@@ -1,8 +1,8 @@
-"""Pure NextTake contracts between VDM evidence and cheat-on-content.
+"""Pure contracts between VDM evidence and the NextTake creator workflow.
 
 This module deliberately does not generate drafts, score content, predict
-performance, or run retros. Those capabilities belong to the vendored
-cheat-on-content skill.
+performance, or run retros. Those capabilities belong to the internal content
+engine and are exposed only through NextTake actions.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def canonical_json(value: Any) -> str:
 
 
 def candidate_id(source: str, title: str, url: str | None = None) -> str:
-    """Match cheat-on-content's stable candidate ID algorithm."""
+    """Use the content engine's stable candidate ID algorithm."""
     normalized_title = "".join(title.strip().lower().split())
     clean_url = url.split("?", 1)[0].rstrip("/") if url else ""
     raw = f"{source.split(':', 1)[0]}|{normalized_title}|{clean_url}"
@@ -149,7 +149,7 @@ def source_pack_markdown(opportunity: dict[str, Any]) -> str:
         f"- Opportunity Artifact: `{opportunity.get('opportunity_artifact', 'pending')}`\n"
         f"- Source Cluster Artifact: `{opportunity['source_cluster_artifact']}`\n"
         f"- Source: `{opportunity['source']}`\n\n"
-        "## Instructions For cheat-seed\n\n"
+        "## NextTake Draft Context\n\n"
         "Use this source pack as evidence for topic discussion and draft generation. "
         "Keep factual claims tied to the listed Evidence IDs. Mark creator opinions or experiences as creator-original. "
         "Do not turn the demand score into a traffic promise.\n\n"
@@ -173,7 +173,7 @@ def candidate_markdown(opportunity: dict[str, Any], source_pack_path: str, snaps
 
 
 def validate_performance(payload: Any) -> dict[str, Any]:
-    """Validate raw metrics for cheat-retro and compute deterministic ratios."""
+    """Validate raw metrics for NextTake retro and compute deterministic ratios."""
     if not isinstance(payload, dict) or set(payload) - PERFORMANCE_FIELDS:
         raise ContentError("invalid_performance_payload")
     values: dict[str, Any] = {}

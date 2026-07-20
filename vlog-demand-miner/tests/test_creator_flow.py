@@ -24,9 +24,9 @@ class CreatorFlowTests(unittest.TestCase):
             "opportunity_artifact": "a" * 64,
         }
 
-    def test_cheat_init_is_required(self) -> None:
+    def test_creator_init_is_required(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(creator_flow.CreatorFlowError, "cheat_init_required"):
+            with self.assertRaisesRegex(creator_flow.CreatorFlowError, "creator_init_required"):
                 creator_flow.write_opportunity(Path(directory), self.opportunity(), "2026-07-17")
 
     def test_writes_native_candidate_source_and_link_idempotently(self) -> None:
@@ -38,6 +38,7 @@ class CreatorFlowTests(unittest.TestCase):
             candidates = (project / "candidates.md").read_text(encoding="utf-8")
             self.assertEqual(candidates.count("<!-- nexttake:abc123def456:start -->"), 1)
             self.assertEqual(first["source_pack"], second["source_pack"])
+            self.assertEqual(first["next_action"]["action"], "generate_current_draft")
             link = json.loads(Path(first["link_file"]).read_text(encoding="utf-8"))
             self.assertIsNone(link["script_path"])
             self.assertEqual(link["opportunity_artifact"], "a" * 64)

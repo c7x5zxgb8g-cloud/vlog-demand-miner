@@ -1,4 +1,4 @@
-"""Thin filesystem bridge from VDM artifacts to cheat-on-content projects."""
+"""Thin filesystem bridge from VDM artifacts to NextTake creator projects."""
 from __future__ import annotations
 
 import json
@@ -26,7 +26,7 @@ def require_creator_project(project: Path) -> Path:
     if not project.is_dir():
         raise CreatorFlowError("creator_project_not_found")
     if not (project / ".cheat-state.json").is_file():
-        raise CreatorFlowError("cheat_init_required")
+        raise CreatorFlowError("creator_init_required")
     return project
 
 
@@ -89,7 +89,7 @@ def write_opportunity(project: Path, opportunity: dict[str, Any], snapshot_at: s
         "source_json": str(source_json),
         "link_file": str(link_path),
         "next_action": {
-            "skill": "cheat-seed",
+            "action": "generate_current_draft",
             "source_pack": str(source_markdown),
             "instruction": f"基于 {relative_source} 讨论并生成这一条内容草稿",
         },

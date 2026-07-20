@@ -6,7 +6,7 @@ import unittest
 
 
 ROOT = Path(__file__).parents[1]
-VENDOR = ROOT / "vendor" / "cheat-on-content"
+VENDOR = ROOT / "vendor" / "content-engine"
 EXPECTED_COMMIT = "9c42fe0c932fe81a12f07428492bdf7ae8488f41"
 EXPECTED_SKILLS = {
     "cheat-bump", "cheat-init", "cheat-learn-from", "cheat-migrate",
@@ -24,13 +24,17 @@ def sha256(path: Path) -> str:
 
 class VendorIntegrityTests(unittest.TestCase):
     def test_complete_skill_and_license_are_preserved(self) -> None:
-        self.assertTrue((VENDOR / "SKILL.md").is_file())
+        self.assertTrue((VENDOR / "ENGINE.md").is_file())
         self.assertTrue((VENDOR / "CHANGELOG.md").is_file())
         self.assertIn("MIT License", (VENDOR / "LICENSE").read_text(encoding="utf-8"))
-        skills = {path.parent.name for path in (VENDOR / "skills").glob("*/SKILL.md")}
+        skills = {path.parent.name for path in (VENDOR / "skills").glob("*/WORKFLOW.md")}
         self.assertEqual(skills, EXPECTED_SKILLS)
         for directory in ("adapters", "hooks", "migrations", "shared-references", "starter-rubrics", "templates", "tools"):
             self.assertTrue((VENDOR / directory).is_dir(), directory)
+
+    def test_only_nexttake_is_discoverable_as_a_skill(self) -> None:
+        descriptors = sorted(path.relative_to(ROOT).as_posix() for path in ROOT.rglob("SKILL.md"))
+        self.assertEqual(descriptors, ["SKILL.md"])
 
     def test_provenance_records_pinned_upstream(self) -> None:
         provenance = (VENDOR / "UPSTREAM.md").read_text(encoding="utf-8")
