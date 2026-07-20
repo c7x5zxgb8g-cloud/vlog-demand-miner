@@ -2,7 +2,7 @@
 
 **这是给完全没数据的新博主用的占位 rubric。**它会打错。**前 5 篇预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
 
-跑完 5 篇（每篇都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1（或直接采用 [opinion-video.md](opinion-video.md) 的 v2 作为起点重新校准权重）。
+跑完 5 篇（每篇都走完 `/predict` → 发布 → `/retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/calibrate` 升级到 v1（或直接采用 [opinion-video.md](opinion-video.md) 的 v2 作为起点重新校准权重）。
 
 ---
 
@@ -130,10 +130,10 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 
 ### 第 5 篇之后：建议固定绝对桶 + 比率桶并存
 
-跑完 5 篇后，你的 baseline 已经从 5 个数据点稳定。`/cheat-status` 会主动提示：
+跑完 5 篇后，你的 baseline 已经从 5 个数据点稳定。`/status` 会主动提示：
 
 > 你已校准 5 篇，可以基于实际分布固定绝对 bucket 边界。
-> 跑 `/cheat-bump --bucket-only` 自动派生。
+> 跑 `/calibrate --bucket-only` 自动派生。
 
 固定后绝对桶用于"长期趋势识别"（这条比上个月那条好不好？），比率桶用于"近期波动"（这条比上一篇好不好？）。
 
@@ -146,7 +146,7 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 **重要警告**：
 - 上面的占位概率是"什么都不知道时的先验"——你的真实分布会在第 5 篇后涌现
 - 第 1-5 篇你对自己 bucket 边界的判断**会大幅波动**——这是 cold-start 的正常状态
-- 第 5 篇之后**必须**跑 `/cheat-bump --bucket-only` 重新校准
+- 第 5 篇之后**必须**跑 `/calibrate --bucket-only` 重新校准
 
 ---
 
@@ -209,10 +209,10 @@ cold-start 期的"预测"不是预测——是**数据采集**。理解这一点
 跑完 5 篇校准后，你有 3 条路：
 
 ### 路径 A：从 v0 → v1（自己拟合权重）
-跑 `/cheat-bump --propose "<你的具体权重调整>"`。系统会强制全量重打 + 跨模型审核。
+跑 `/calibrate --propose "<你的具体权重调整>"`。系统会强制全量重打 + 跨模型审核。
 
 ### 路径 B：直接采纳 v2 作为起点
-把 [opinion-video.md](opinion-video.md) 的 v2 公式抄到你的 `rubric_notes.md`，**然后跑 `/cheat-bump`**——bump 流程会用你的 5 篇数据验证 v2 在你账号上是否真的更优。
+把 [opinion-video.md](opinion-video.md) 的 v2 公式抄到你的 `rubric_notes.md`，**然后跑 `/calibrate`**——bump 流程会用你的 5 篇数据验证 v2 在你账号上是否真的更优。
 
 ### 路径 C：保持 v0 等权，跑更多样本
 如果 5 篇还看不出明显 pattern，再跑 5 篇。等权的 v0 在 10-15 个样本之前都不丢人。

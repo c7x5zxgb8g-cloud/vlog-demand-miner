@@ -9,10 +9,10 @@ ROOT = Path(__file__).parents[1]
 VENDOR = ROOT / "vendor" / "content-engine"
 EXPECTED_COMMIT = "9c42fe0c932fe81a12f07428492bdf7ae8488f41"
 EXPECTED_SKILLS = {
-    "cheat-bump", "cheat-init", "cheat-learn-from", "cheat-migrate",
-    "cheat-persona", "cheat-predict", "cheat-publish", "cheat-recommend",
-    "cheat-retro", "cheat-score", "cheat-score-blind", "cheat-seed",
-    "cheat-shoot", "cheat-status", "cheat-trends",
+    "calibrate", "initialize", "learn-from", "migrate",
+    "persona", "predict", "publish", "recommend",
+    "retro", "score", "score-blind", "ideate",
+    "shoot", "status", "trends",
 }
 
 
@@ -38,11 +38,12 @@ class VendorIntegrityTests(unittest.TestCase):
 
     def test_provenance_records_pinned_upstream(self) -> None:
         provenance = (VENDOR / "UPSTREAM.md").read_text(encoding="utf-8")
-        self.assertIn("XBuilderLAB/cheat-on-content", provenance)
+        repository_line = next(line for line in provenance.splitlines() if line.startswith("- Repository:"))
+        self.assertRegex(repository_line, r"https://github\.com/[^/]+/[^\`]+\.git")
         self.assertIn(EXPECTED_COMMIT, provenance)
 
     def test_vendor_contains_no_generated_or_private_state(self) -> None:
-        forbidden_names = {".git", "__pycache__", ".auth", ".auth-xhs", ".auth-linkedin", ".debug", ".cheat-cache", ".cheat-secrets.json"}
+        forbidden_names = {".git", "__pycache__", ".auth", ".auth-xhs", ".auth-linkedin", ".debug", ".nexttake-cache", ".nexttake-secrets.json"}
         offenders = []
         for path in VENDOR.rglob("*"):
             if path.name in forbidden_names or path.suffix == ".pyc":

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# cheat-on-content / prediction-immutability hook
+# NextTake Content Engine / prediction-immutability hook
 #
 # Wires PreToolUse(Edit|Write) → blocks any edit that touches the
 # '## 预测' / '## Prediction' section of a file under predictions/.
@@ -15,7 +15,7 @@
 #   - Any change to lines between '## 预测' (or '## Prediction') and the next H2
 #
 # Bypass (rare, for true formatting-only fixes):
-#   CHEAT_BYPASS_IMMUTABILITY=1 — single-shot bypass; logs a warning to stderr
+#   NEXTTAKE_BYPASS_IMMUTABILITY=1 — single-shot bypass; logs a warning to stderr
 #
 # Requirements: bash 3+, jq, diff. Mac default install has all of these.
 #
@@ -26,10 +26,10 @@
 set -uo pipefail
 
 # Single-shot bypass — opt-in, logs prominently
-if [[ "${CHEAT_BYPASS_IMMUTABILITY:-0}" == "1" ]]; then
-  echo "[cheat-on-content] ⚠️  IMMUTABILITY BYPASS active (CHEAT_BYPASS_IMMUTABILITY=1)" >&2
-  echo "[cheat-on-content] ⚠️  This should only be used for pure markdown-formatting fixes." >&2
-  echo "[cheat-on-content] ⚠️  Bypass will be visible in git history." >&2
+if [[ "${NEXTTAKE_BYPASS_IMMUTABILITY:-0}" == "1" ]]; then
+  echo "[NextTake Content Engine] ⚠️  IMMUTABILITY BYPASS active (NEXTTAKE_BYPASS_IMMUTABILITY=1)" >&2
+  echo "[NextTake Content Engine] ⚠️  This should only be used for pure markdown-formatting fixes." >&2
+  echo "[NextTake Content Engine] ⚠️  Bypass will be visible in git history." >&2
   exit 0
 fi
 
@@ -112,10 +112,10 @@ if [[ "$tool_name" == "Edit" ]]; then
   if grep -qF -- "$old_string" "$pred_tmp" 2>/dev/null; then
     cat >&2 <<EOF
 
-[cheat-on-content] 🚫 BLOCKED: edit targets the '## 预测' / '## Prediction' section of:
+[NextTake Content Engine] 🚫 BLOCKED: edit targets the '## 预测' / '## Prediction' section of:
   $file_path
 
-This violates principle #1 of cheat-on-content: predictions are immutable.
+This violates principle #1 of NextTake Content Engine: predictions are immutable.
 Once written, the prediction section can never be modified — only the
 '## 复盘' / '## Retrospective' section can be appended to.
 
@@ -126,7 +126,7 @@ What to do instead:
   • If you noticed a factual mistake AFTER seeing data, document it in the
     '## 复盘' section: "Correction: original probability X% should have been Y%".
   • If this is a pure markdown-formatting fix (no semantic change), you can
-    bypass once with: CHEAT_BYPASS_IMMUTABILITY=1 (logs to stderr, visible in git).
+    bypass once with: NEXTTAKE_BYPASS_IMMUTABILITY=1 (logs to stderr, visible in git).
 
 See: shared-references/blind-prediction-protocol.md
 EOF
@@ -140,7 +140,7 @@ fi
 if [[ "$tool_name" == "Write" && -f "$file_path" ]]; then
   cat >&2 <<EOF
 
-[cheat-on-content] 🚫 BLOCKED: Write would overwrite an existing prediction file:
+[NextTake Content Engine] 🚫 BLOCKED: Write would overwrite an existing prediction file:
   $file_path
 
 Use Edit on the '## 复盘' section to append retrospective content.

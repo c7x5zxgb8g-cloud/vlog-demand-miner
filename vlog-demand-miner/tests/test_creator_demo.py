@@ -25,7 +25,7 @@ class CreatorDemoTests(unittest.TestCase):
             html = Path(result["studio"]).read_text(encoding="utf-8")
             for label in ("发现", "本期文案", "本期复盘", "下一条", "下一期文案", "面试团播公司", "演示数据"):
                 self.assertIn(label, html)
-            for internal in ("原生 cheat-on-content 工作流", "VDM source pack", "Immutable section hash", "CMT-", "OPP-", "L1_demand_signal"):
+            for internal in ("原生 NextTake Content Engine 工作流", "VDM source pack", "Immutable section hash", "CMT-", "OPP-", "L1_demand_signal"):
                 self.assertNotIn(internal, html)
             self.assertNotIn("<script>alert", html)
 

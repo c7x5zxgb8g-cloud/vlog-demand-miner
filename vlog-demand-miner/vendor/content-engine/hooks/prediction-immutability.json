@@ -1,5 +1,5 @@
 {
-  "_comment": "cheat-on-content prediction immutability hook. Blocks edits to '## 预测' / '## Prediction' sections in predictions/*.md files. Merge this into your project's .claude/settings.json on /cheat-init.",
+  "_comment": "NextTake Content Engine prediction immutability hook. Blocks edits to '## 预测' / '## Prediction' sections in predictions/*.md files. Merge this into your project's .claude/settings.json on /initialize.",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.cheat-hooks/prediction-immutability.sh",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.nexttake-hooks/prediction-immutability.sh",
             "timeout": 3,
             "async": false
           }

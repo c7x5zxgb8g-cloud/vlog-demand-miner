@@ -1,6 +1,6 @@
 # Rubric Bump Validation Protocol（升级验证协议）
 
-被这些子 workflow 引用：`cheat-bump`、主 ENGINE.md。
+被这些子 workflow 引用：`calibrate`、主 ENGINE.md。
 
 这是项目原则 #2 的完整规范——**升级 = 全量重打**。任何对 rubric 的结构性变更都必须走完本协议。
 
@@ -103,7 +103,7 @@ v2.1  composite = (ER×2.0 + HP×1.5 + MS×1.5 + QL + SR + TS + SAT) / 9.0 × 2.
 3. 外部 LLM 必须输出 **PASS** / **REJECT** + ≥ 100 字理由
 4. 本地判定与外部判定**两个都通过**才能进入 Step 5
 
-`CROSS_MODEL_AUDIT=false`：跳过外部审核——**仅在离线/无网时使用**。state file 标记 `last_bump_self_audited: true`，`cheat-status` 持续提示用户配置外部审核。
+`CROSS_MODEL_AUDIT=false`：跳过外部审核——**仅在离线/无网时使用**。state file 标记 `last_bump_self_audited: true`，`status` 持续提示用户配置外部审核。
 
 ### Step 5：升级后清算（Cleanup pass）
 

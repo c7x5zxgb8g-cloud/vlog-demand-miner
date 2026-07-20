@@ -8,7 +8,7 @@
 
 **这是给完全没数据的新博主用的占位 rubric。**它会打错。**前 5 篇预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
 
-跑完 5 篇（每篇都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1。
+跑完 5 篇（每篇都走完 `/predict` → 发布 → `/retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/calibrate` 升级到 v1。
 
 ---
 
@@ -111,7 +111,7 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 | 小爆 | 3 - 10 × baseline | 显著破圈 |
 | 大爆 | > 10 × baseline | 量级跃迁 |
 
-第 5 篇后跑 `/cheat-bump --bucket-only` 重新校准边界。
+第 5 篇后跑 `/calibrate --bucket-only` 重新校准边界。
 
 ---
 
@@ -140,7 +140,7 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 - **这是通用 rubric**——维度定义可能与你的内容形式严重不匹配。**用它收集数据，不要用它做决策**
 - cold-start 期 composite 的置信度低——**不要基于 v0 分数决定要不要发某篇内容**
 - 前 5 篇**每篇必须走完整闭环**（predict → 发布 → retro），跳过任何一篇复盘 = 整个校准失败
-- 第 5 篇后**必须**跑 `/cheat-bump` 升级——**通用 rubric 尤其需要 bump**，因为维度本身可能需要替换
+- 第 5 篇后**必须**跑 `/calibrate` 升级——**通用 rubric 尤其需要 bump**，因为维度本身可能需要替换
 
 ---
 

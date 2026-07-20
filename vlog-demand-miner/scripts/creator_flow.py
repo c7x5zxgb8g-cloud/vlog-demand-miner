@@ -25,7 +25,7 @@ def require_creator_project(project: Path) -> Path:
     project = project.expanduser().resolve()
     if not project.is_dir():
         raise CreatorFlowError("creator_project_not_found")
-    if not (project / ".cheat-state.json").is_file():
+    if not (project / ".nexttake-state.json").is_file():
         raise CreatorFlowError("creator_init_required")
     return project
 

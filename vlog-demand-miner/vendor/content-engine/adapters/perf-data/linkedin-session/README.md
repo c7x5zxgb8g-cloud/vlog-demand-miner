@@ -1,6 +1,6 @@
 # Adapter: linkedin-session（LinkedIn 单帖分析爬取）
 
-被 `/cheat-retro` 在 `state.data_collection=adapter` + `platform=linkedin` 时自动调用。
+被 `/retro` 在 `state.data_collection=adapter` + `platform=linkedin` 时自动调用。
 
 > **来源**：架构照搬 `douyin-session`（Playwright 持久化登录态 + 读渲染后 DOM）。
 > 单帖分析（impressions / reach / reactions / …）已在真实 LinkedIn 账号上端到端验证。
@@ -21,8 +21,8 @@ linkedin-session 用 **Playwright + 持久化 Chromium context** 模拟真实浏
 - 抓单帖的 10 个指标：展示 / 触达 / 反应 / 评论 / 转发 / 收藏 / 私信转发 / 社交互动 /
   帖子带来的主页访问 / 帖子带来的新增关注，外加帖子正文
 
-输出写到**你的内容项目** `videos/<...>/report.md`（`cheat-retro` 读这个文件 → 摘要写到 prediction 复盘段）。
-调试产物（DOM 文本 dump）写到 `.cheat-cache/linkedin-session-debug/`，避免散落在 skill 源码目录。
+输出写到**你的内容项目** `videos/<...>/report.md`（`retro` 读这个文件 → 摘要写到 prediction 复盘段）。
+调试产物（DOM 文本 dump）写到 `.nexttake-cache/linkedin-session-debug/`，避免散落在 skill 源码目录。
 
 ## 一个诚实的维护说明：LinkedIn 会随机切换 日/英
 
@@ -48,18 +48,18 @@ pip install -r "$ADAPTER/requirements.txt"
 playwright install chromium
 
 # 5. 首次登录 LinkedIn
-ADAPTER=$(find ~/cheat-on-content -name "linkedin-session" -type d 2>/dev/null | head -1)
+ADAPTER=$(find ~/NextTake Content Engine -name "linkedin-session" -type d 2>/dev/null | head -1)
 python "$ADAPTER/crawler.py" login
 # → 弹出 Chromium 窗口，登录 LinkedIn
 # → 登录成功后窗口自动关闭，cookie(li_at) 存在 当前目录/.auth-linkedin/
 ```
 
-> 提示：adapter 在 `~/cheat-on-content/adapters/perf-data/linkedin-session`（克隆源码处），
+> 提示：adapter 在 `<nexttake-root>/vlog-demand-miner/vendor/content-engine/adapters/perf-data/linkedin-session`，
 > 不在 `~/.claude/skills`（install.sh 只复制 skill，不复制 adapter）。
 
 ## 用法
 
-cheat-retro 自动调用，你不需要手动跑。手动测试：
+retro 自动调用，你不需要手动跑。手动测试：
 
 ```bash
 cd ~/my-channel
@@ -71,7 +71,7 @@ python "$ADAPTER/review.py" video 7470493738918920193 <video_folder>/script.md
 # 输出在 当前目录/videos/<日期>_<activity_id>_<作者>/report.md
 ```
 
-run.sh 是 cheat-retro 调用的 wrapper：
+run.sh 是 retro 调用的 wrapper：
 
 ```bash
 bash run.sh <activity_id_or_url> <video_folder> [<script_path>]
@@ -85,7 +85,7 @@ LinkedIn 帖子 URL 形态：
 - 分析页 `https://www.linkedin.com/analytics/post-summary/urn:li:activity:7470493738918920193/` → 同上
 
 adapter 会从整条链接里自动提取 activity_id（也接受直接给裸 id）。
-cheat-publish 登记发布时把 activity_id 存到 prediction header，cheat-retro 启动时读这个字段。
+publish 登记发布时把 activity_id 存到 prediction header，retro 启动时读这个字段。
 
 ## report.md 输出格式
 
@@ -95,7 +95,7 @@ cheat-publish 登记发布时把 activity_id 存到 prediction header，cheat-re
 - 数据快照（展示 / 触达 / 反应 / 评论 / 转发 / 收藏 / 私信转发 / 社交互动 /
   帖子带来的主页访问 / 帖子带来的新增关注 + 派生比率：反应率 / 评论率 / 转发率 / 社交互动率）
 - 帖子正文（从分析页 DOM 抽到时）
-- 原始稿子（cheat-retro 传入）
+- 原始稿子（retro 传入）
 - 评论（**LinkedIn 单帖分析页只给评论数、不给评论正文**——report.md 会标注，建议手动粘 top 评论）
 
 ## 失败模式（按概率从高到低）
@@ -104,7 +104,7 @@ cheat-publish 登记发布时把 activity_id 存到 prediction header，cheat-re
 |---|---|---|
 | `ensure_login` 超时 | cookie 过期或 LinkedIn 强制 reauth | 重新跑 `python crawler.py login` |
 | 抓取被重定向到登录页 | `li_at` 失效 | 重新跑 `python crawler.py login` |
-| `impressions` 为 None / 指标缺失 | LinkedIn 改了版式或换了第三种语言 | 看 `.cheat-cache/linkedin-session-debug/post_<id>.txt`，把新标签加进 `extract.py` 的 `POST_METRICS` |
+| `impressions` 为 None / 指标缺失 | LinkedIn 改了版式或换了第三种语言 | 看 `.nexttake-cache/linkedin-session-debug/post_<id>.txt`，把新标签加进 `extract.py` 的 `POST_METRICS` |
 | 看不到分析数据 | 该帖**不是你本人**发的（单帖分析仅作者可见） | 只能抓自己的帖子 |
 | 正文没抓到 | 分析页 DOM 偶尔不含完整正文 | report.md 会标注；手动补正文 |
 | Chromium 崩溃 / 卡死 | 通常是机器内存不足 | 关其他 Chromium；`playwright install chromium --force` 重装 |
@@ -124,7 +124,7 @@ cheat-publish 登记发布时把 activity_id 存到 prediction header，cheat-re
 - **TOS 风险**：用自己的 cookie 抓自己后台数据是个人用途；别滥用、别高频
 - **不要把 `.auth-linkedin/` 提交到 git**：cookie(`li_at`) 等同你的 LinkedIn 会话凭据，
   泄露 = 他人能登录你的 LinkedIn 账号
-- `.cheat-cache/linkedin-session-debug/` 也不应提交（里面是页面 DOM 文本 dump，可能含个人信息）
+- `.nexttake-cache/linkedin-session-debug/` 也不应提交（里面是页面 DOM 文本 dump，可能含个人信息）
 
 ## 文件清单
 
@@ -139,7 +139,7 @@ adapters/perf-data/linkedin-session/
 ├── paths.py            # 项目根 / .auth-linkedin / debug 路径解析
 ├── test_extract.py     # extract.py 单元测试（合成样本，含双语）
 ├── .gitattributes      # *.sh / *.py eol=lf（防 Windows-CRLF 破坏脚本）
-└── run.sh              # cheat-retro 调用的 wrapper
+└── run.sh              # retro 调用的 wrapper
 ```
 
 ## 与其他 adapter 的关系

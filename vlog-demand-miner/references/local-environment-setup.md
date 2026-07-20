@@ -72,14 +72,13 @@ After the window closes, verify the runtime and run a small serial sync:
 
 Browser Provider reuses the upstream persistent browser session and passive XHR capture for public-video comments. VDM never copies, exports, prints, or writes Cookie/browser-storage values to projects, artifacts, reports, model inputs, or logs; it does not download media, solve CAPTCHA, or claim complete/random comment coverage. This upstream public-page path does not expose a stable raw user ID, so Browser comments use an HMAC of the available display name and carry `commenter_identity_display_name_based`; missing names remain unidentified. Never treat comment IDs as independent users. When ASR is required, supply a locally obtained media file and use `transcript-import`.
 
-Adapter discovery checks these locations in order:
+The default adapter is bundled with NextTake:
 
 ```text
 <skill-root>/vendor/content-engine/adapters/perf-data/douyin-session
-<state-dir>/upstreams/content-engine/adapters/perf-data/douyin-session
 ```
 
-The managed path is installed automatically at the pinned engine revision only when the bundled copy is absent. Set `NEXTTAKE_CONTENT_ENGINE_ROOT` to select another complete source root, or set `NEXTTAKE_DOUYIN_ADAPTER_DIR` / pass `--douyin-adapter-dir` for an explicit adapter path. The adapter's creator-center inventory and private metrics are never used for competitor accounts; NextTake only uses its browser-session and public-video comment acquisition path.
+If the bundled copy is unavailable, setup reports `bundled_douyin_adapter_missing` instead of probing unrelated installations or cloning another project. Set `NEXTTAKE_CONTENT_ENGINE_ROOT` to select another complete source root, or set `NEXTTAKE_DOUYIN_ADAPTER_DIR` / pass `--douyin-adapter-dir` for an explicit adapter path. The adapter's creator-center inventory and private metrics are never used for competitor accounts; NextTake only uses its browser-session and public-video comment acquisition path.
 
 After setup, use the `environment` object exactly as returned, then execute the `next_actions` arrays in order. They include the absolute Browser Python, upstream adapter, persistent profile, B站 CLI, interactive login commands, project path, and final `doctor` command. Never convert or log a Keychain secret as part of this handoff.
 

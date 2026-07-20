@@ -8,7 +8,7 @@
 
 [TrendRadar](https://github.com/sansan0/TrendRadar) 是 57k stars 的中文热点聚合监控（用 newsnow API 拉微博 / 知乎 / 抖音 / B 站 / 头条 等多平台）。它自带独立的 MCP server `trendradar-mcp`，暴露 25+ 个 tool。
 
-cheat-on-content 把它当作 trend-sources adapter 之一——用户配 MCP server 后，cheat-seed / cheat-trends 自然能调。
+NextTake Content Engine 把它当作 trend-sources adapter 之一——用户配 MCP server 后，ideate / trends 自然能调。
 
 - **多平台覆盖**：微博 / 知乎 / 抖音 / B站 / 头条 / 36kr / 等等
 - **AI 增强工具**：`analyze_topic_trend` 给爆火/衰退判定；`compare_periods` 给周环比；`analyze_sentiment` 给情感倾向
@@ -18,25 +18,25 @@ cheat-on-content 把它当作 trend-sources adapter 之一——用户配 MCP se
 
 参考 TrendRadar 仓库的 [MCP 配置文档](https://github.com/sansan0/TrendRadar)。装好后用户的 Claude Code `.claude/settings.json` 含 `mcp__trendradar__*` 系列工具。
 
-cheat-on-content 不打包 TrendRadar——用户自己装、自己保管 server 资源。
+NextTake Content Engine 不打包 TrendRadar——用户自己装、自己保管 server 资源。
 
-## cheat-seed / cheat-trends 调用的关键工具
+## ideate / trends 调用的关键工具
 
 | MCP 工具 | 用途 | 在哪调 |
 |---|---|---|
-| `mcp__trendradar__get_latest_news` | 拿最新热榜（最直接） | cheat-seed Mode C 主调 / cheat-trends 主调 |
-| `mcp__trendradar__get_trending_topics` | 自动提取话题统计 | cheat-seed Mode C 备用 |
-| `mcp__trendradar__analyze_topic_trend` | 单话题趋势分析（爆火/衰退） | cheat-seed Mode A 灰色场景 enrich（用户提了具体话题且同意拉数据） |
-| `mcp__trendradar__compare_periods` | 周环比 / 月环比 | cheat-bump 升级 rubric 时作"用户领域是否变化"的弱信号（罕见用） |
-| `mcp__trendradar__search_news` | 关键词搜索 | cheat-seed Mode A 用户提了关键词时 |
+| `mcp__trendradar__get_latest_news` | 拿最新热榜（最直接） | ideate Mode C 主调 / trends 主调 |
+| `mcp__trendradar__get_trending_topics` | 自动提取话题统计 | ideate Mode C 备用 |
+| `mcp__trendradar__analyze_topic_trend` | 单话题趋势分析（爆火/衰退） | ideate Mode A 灰色场景 enrich（用户提了具体话题且同意拉数据） |
+| `mcp__trendradar__compare_periods` | 周环比 / 月环比 | calibrate 升级 rubric 时作"用户领域是否变化"的弱信号（罕见用） |
+| `mcp__trendradar__search_news` | 关键词搜索 | ideate Mode A 用户提了关键词时 |
 
 ## 输出格式契约
 
-TrendRadar MCP 返回 JSON / markdown。cheat-seed 收到后：
+TrendRadar MCP 返回 JSON / markdown。ideate 收到后：
 
 1. 解析 items（title / source / hot_score / snapshot_at / url）
 2. 按 [candidate-schema.md](../../shared-references/candidate-schema.md) 算稳定 id（`sha256(source + normalized_title + url_path)[:12]`）
-3. 去重（参考 cheat-trends 的去重协议）
+3. 去重（参考 trends 的去重协议）
 4. 用当前 rubric 粗筛
 5. 写入 `candidates.md`
 
@@ -44,7 +44,7 @@ TrendRadar MCP 返回 JSON / markdown。cheat-seed 收到后：
 
 | 症状 | 处理 |
 |---|---|
-| MCP server 没装 / 没启动 | cheat-seed 自动降级到下一个启用的源（如 aihot 或 manual-paste），不抛异常 |
+| MCP server 没装 / 没启动 | ideate 自动降级到下一个启用的源（如 aihot 或 manual-paste），不抛异常 |
 | MCP 调用超时 | 30 秒后超时，提示用户"trendradar 慢，要等还是切别的源" |
 | newsnow 上游 API 改了 | TrendRadar 维护者会修；用户跟着升级 |
 
@@ -61,6 +61,6 @@ TrendRadar MCP 返回 JSON / markdown。cheat-seed 收到后：
 
 ## 给 TrendRadar 团队的话
 
-如果你是 TrendRadar 维护者看到这份 adapter doc——感谢你把多平台聚合做成 MCP server。cheat-on-content 是你们项目的"内容生产侧下游"——用户用 TrendRadar 知道发生了啥，用 cheat-on-content 把这个变成可校准的内容预测循环。互补不替代。
+如果你是 TrendRadar 维护者看到这份 adapter doc——感谢你把多平台聚合做成 MCP server。NextTake Content Engine 是你们项目的"内容生产侧下游"——用户用 TrendRadar 知道发生了啥，用 NextTake Content Engine 把这个变成可校准的内容预测循环。互补不替代。
 
-欢迎 cross-link：[github.com/XBuilderLAB/cheat-on-content](https://github.com/XBuilderLAB/cheat-on-content)。
+欢迎 cross-link：[UPSTREAM.md](UPSTREAM.md)。

@@ -2,7 +2,7 @@
 #
 # linkedin-session adapter wrapper
 #
-# Called by /cheat-retro when state.data_collection=adapter and platform=linkedin.
+# Called by /retro when state.data_collection=adapter and platform=linkedin.
 #
 # Usage:
 #   bash run.sh <activity_id_or_url> <video_folder> [<script_path>]
@@ -58,7 +58,7 @@ Install in your project venv:
   pip install -r "$ADAPTER_DIR/requirements.txt"
   playwright install chromium
 
-Then re-run /cheat-retro.
+Then re-run /retro.
 EOF
   exit 2
 fi
@@ -90,8 +90,8 @@ fi
 
 # Run from PROJECT_ROOT so .auth-linkedin/ is found; override videos dir to user's
 cd "$PROJECT_ROOT"
-export CHEAT_PROJECT_ROOT="$PROJECT_ROOT"
-export CHEAT_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
+export NEXTTAKE_PROJECT_ROOT="$PROJECT_ROOT"
+export NEXTTAKE_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
 
 echo "[linkedin-session] fetching activity=$ACTIVITY_ID into $VIDEO_FOLDER"
 if [[ -n "$SCRIPT_ARG" ]]; then
@@ -100,7 +100,7 @@ else
   "$PYTHON" "$ADAPTER_DIR/review.py" video "$ACTIVITY_ID"
 fi
 
-# review.py writes to CHEAT_VIDEOS_DIR/<auto-named-folder>/report.md.
+# review.py writes to NEXTTAKE_VIDEOS_DIR/<auto-named-folder>/report.md.
 # Move it into our canonical video_folder if names differ.
 LATEST_REPORT=$(find "$( dirname "$VIDEO_FOLDER" )" -name "report.md" -newer "$VIDEO_FOLDER" -type f 2>/dev/null | head -1)
 if [[ -n "$LATEST_REPORT" && "$( dirname "$LATEST_REPORT" )" != "$VIDEO_FOLDER" ]]; then

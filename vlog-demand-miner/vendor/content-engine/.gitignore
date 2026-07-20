@@ -25,12 +25,12 @@ venv/
 *.sqlite
 *.sqlite3
 
-# 用户项目数据（万一开发者在 cheat-on-content 源码目录里跑了 cheat-init）
+# 用户项目数据（万一开发者在 NextTake Content Engine 源码目录里跑了 initialize）
 # 这些文件应该在用户自己的 content project 里，不该污染源码 repo
-.cheat-state.json
-.cheat-cache/
-.cheat-hooks/
-.cheat-secrets.json
+.nexttake-state.json
+.nexttake-cache/
+.nexttake-hooks/
+.nexttake-secrets.json
 predictions/
 videos/
 scripts/

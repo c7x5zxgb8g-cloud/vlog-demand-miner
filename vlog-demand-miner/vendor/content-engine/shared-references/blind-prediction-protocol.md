@@ -1,6 +1,6 @@
 # Blind Prediction Protocol（盲预测协议）
 
-被这些子 workflow 引用：`cheat-predict`、`cheat-retro`、主 ENGINE.md。
+被这些子 workflow 引用：`predict`、`retro`、主 ENGINE.md。
 
 这是项目原则 #1 的完整规范。任何子 skill 在写预测前都必须执行本协议。
 
@@ -36,7 +36,7 @@
 
 ## 预测者必须主动声明的情况
 
-子 skill 在启动 `cheat-predict` 前，必须自检并向用户**主动声明**：
+子 skill 在启动 `predict` 前，必须自检并向用户**主动声明**：
 
 1. **作品已发布超过 RETRO_WINDOW_DAYS 天**（默认 3 天）→ 必须拒绝写"预测"，改记为 `**Reconstructed retrospective**`，明确标注非预测
 2. **作品已发布但 < RETRO_WINDOW_DAYS 天，用户尚未透露任何数据**→ 允许 blind 预测，但在文件头部标记 `published_before_prediction: true` + `blind_status: confirmed_no_data_seen`
@@ -60,7 +60,7 @@
 - "我的概率分布写错了 0.5%，让我改一下" → 拒绝。在复盘段追加 `修正：原概率分布 X% 应为 Y%，于 <date> 发现笔误`
 - "我前面没考虑 SR=4，重打一下分" → 拒绝。同上路径
 
-唯一允许编辑预测段的场景：**纯 markdown 排版错误**（标题层级错误、列表 bullet 格式错），且用户明确说明这是格式修复。这种情况 hook 仍会阻塞，需要用户显式 bypass（手动设置环境变量 `CHEAT_BYPASS_IMMUTABILITY=1` 单次）——bypass 应在 git history 留痕。
+唯一允许编辑预测段的场景：**纯 markdown 排版错误**（标题层级错误、列表 bullet 格式错），且用户明确说明这是格式修复。这种情况 hook 仍会阻塞，需要用户显式 bypass（手动设置环境变量 `NEXTTAKE_BYPASS_IMMUTABILITY=1` 单次）——bypass 应在 git history 留痕。
 
 ---
 
@@ -69,11 +69,11 @@
 一个内容三处文件，**用同一组 `<date>_<id>_<short>` 命名**：
 
 ```
-scripts/<date>_<id>_<short>.md        ← pre-shoot 草稿（cheat-seed 写或用户写）
-predictions/<date>_<id>_<short>.md    ← immutable 预测（cheat-predict 写）
-videos/<date>_<id>_<short>/           ← 拍后才建（cheat-shoot 创建）
+scripts/<date>_<id>_<short>.md        ← pre-shoot 草稿（ideate 写或用户写）
+predictions/<date>_<id>_<short>.md    ← immutable 预测（predict 写）
+videos/<date>_<id>_<short>/           ← 拍后才建（shoot 创建）
   ├── script.md                       ← 用户提供的最终拍摄稿
-  └── report.md                       ← T+3d 数据（cheat-retro 写）
+  └── report.md                       ← T+3d 数据（retro 写）
 ```
 
 - `<date>`：**草稿首次落盘日期**（即 `scripts/<id>.md` 的创建日），不是预测日 / 拍摄日 / 发布日。理由：保持 ID 稳定——草稿大改后 hash 变了仍想保持文件可追溯
@@ -91,14 +91,14 @@ Reconstructed 重做：在 `<short>` 后加 `_redo`，三处都加：
 
 ## 子 skill 必须做的检查清单
 
-`cheat-predict` 启动时：
+`predict` 启动时：
 1. 读 `BLIND_CHECK` 常量
 2. 询问用户该作品当前发布状态（未发 / 已发 < RETRO_WINDOW_DAYS / 已发 ≥ RETRO_WINDOW_DAYS）
 3. 询问对话历史里是否提到过该作品的任何后续数据（如有，自检对话里有没有 "播放/阅读/点赞/评论" 等关键词）
 4. 若 #2 或 #3 命中破坏条件 → 按 `BLIND_CHECK` 模式处理
 5. 通过后才允许写 `predictions/*.md`
 
-`cheat-retro` 启动时：
+`retro` 启动时：
 1. 读目标 prediction 文件
 2. **先在内存里 cache 住 `## 预测` 段**——后续任何对该文件的写都必须先校验该段未变
 3. 抓数据 → 追加 `## 复盘` 段
@@ -113,7 +113,7 @@ Reconstructed 重做：在 `<short>` 后加 `_redo`，三处都加：
 
 | 场景 | 处理 |
 |---|---|
-| 预测文件不小心被人手编辑了预测段 | 不自动回滚（破坏更大）。下次 `cheat-retro` 检测到不一致 → 在复盘段追加 `**Integrity warning**: 预测段于 <ISO timestamp> 被外部修改，无法保证盲度`，校准价值降级为"参考"，不计入 bump 校准池 |
+| 预测文件不小心被人手编辑了预测段 | 不自动回滚（破坏更大）。下次 `retro` 检测到不一致 → 在复盘段追加 `**Integrity warning**: 预测段于 <ISO timestamp> 被外部修改，无法保证盲度`，校准价值降级为"参考"，不计入 bump 校准池 |
 | 预测文件遗失 / 被删 | git log 找回。找不到 → 在 `rubric_notes.md` 记录"<id> 预测文件遗失，校准池缺该样本" |
 | 用户原本是 cold-start，半路想"补"已发作品的预测 | 一律记为 `**Reconstructed retrospective**`，不计入校准池——这是补的不是预测。可作为"观察"记录到 `rubric_notes.md` |
 
@@ -130,7 +130,7 @@ Reconstructed 重做：在 `<short>` 后加 `_redo`，三处都加：
 
 ## Why（为什么这套这么严）
 
-盲预测是整个 cheat-on-content 校准循环的**唯一信号源**。一旦预测段被事后修改，所有"哪个维度被验证 / 推翻"的判断都失去基线——你不知道当初是真预测对了，还是事后改对了。
+盲预测是整个 NextTake Content Engine 校准循环的**唯一信号源**。一旦预测段被事后修改，所有"哪个维度被验证 / 推翻"的判断都失去基线——你不知道当初是真预测对了，还是事后改对了。
 
 校准价值 = 预测精度 × 预测可信度。
 - 预测精度可以靠 rubric 升级慢慢提升。

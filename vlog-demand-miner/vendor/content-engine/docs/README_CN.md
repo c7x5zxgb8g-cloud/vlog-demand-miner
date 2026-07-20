@@ -1,8 +1,8 @@
 <h1 align="center">
-  <img src="logo.svg" alt="Cheat on Content" width="720">
+  <img src="logo.svg" alt="NextTake Content Engine" width="720">
 </h1>
 
-<h2 align="center">Cheat on Content</h2>
+<h2 align="center">NextTake Content Engine</h2>
 
 <p align="center">
   <a href="../README.md"><strong>English</strong></a>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://watcha.cn/products/cheat-on-content">
+  <a href="https://watcha.cn/products/NextTake Content Engine">
     <img src="guancha-no1.svg" alt="Watcha Hot List · 观猹热榜 · #1" width="328">
   </a>
 </p>
@@ -113,12 +113,12 @@
 ## 📦 安装
 
 ```bash
-git clone https://github.com/XBuilderLAB/cheat-on-content.git
-cd cheat-on-content
+git clone UPSTREAM.md
+cd NextTake Content Engine
 bash install.sh
 ```
 
-> ⚠️ **从 v0.x 升级？** `git pull` 后在你的内容项目里跑 `/cheat-migrate`。**1.3 → 1.4 是 blind channel 完整性 BREAKING 修复**——拆分 `rubric_notes.md` 防止 blind sub-agent 通过白名单读到实绩。不跑迁移的话 blind 打分会持续标 `non_blind_warning`。详见 [CHANGELOG](../CHANGELOG.md) 和 [migrations/1.3-to-1.4.md](../migrations/1.3-to-1.4.md)。
+> ⚠️ **从 v0.x 升级？** `git pull` 后在你的内容项目里跑 `/migrate`。**1.3 → 1.4 是 blind channel 完整性 BREAKING 修复**——拆分 `rubric_notes.md` 防止 blind sub-agent 通过白名单读到实绩。不跑迁移的话 blind 打分会持续标 `non_blind_warning`。详见 [CHANGELOG](../CHANGELOG.md) 和 [migrations/1.3-to-1.4.md](../migrations/1.3-to-1.4.md)。
 
 14 个子 skill 软链接到你 agent 的 skill 目录。装一次，所有内容项目都能用。
 
@@ -135,7 +135,7 @@ bash install.sh
 在你的内容项目目录里打开支持 skill 的 agent，说：
 
 ```
-初始化 cheat-on-content
+初始化 NextTake Content Engine
 ```
 
 5 个 yes/no 搞定 onboarding。**强烈建议导对标账号**——5-10 条样本 → 工具立刻有 anchor，不然前 5 篇预测精度 ±50%。
@@ -161,7 +161,7 @@ bash install.sh
 
 ## 📈 Star History
 
-<a href="https://star-history.com/#XBuilderLAB/cheat-on-content&Date">
+<a href="https://star-history.com/#c7x5zxgb8g-cloud/vlog-demand-miner&Date">
   <img src="star-history.svg" alt="Star History Chart" width="720">
 </a>
 

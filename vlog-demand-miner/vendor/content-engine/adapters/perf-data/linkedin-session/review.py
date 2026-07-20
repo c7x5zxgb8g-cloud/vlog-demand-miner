@@ -4,7 +4,7 @@
     python review.py login                              # 仅登录（首次，弹出浏览器）
     python review.py video <activity_id_or_url> [script.txt]   # 抓单帖分析
 
-`video` 子命令名沿用 douyin-session / bilibili-stat 的契约（/cheat-retro 统一调
+`video` 子命令名沿用 douyin-session / bilibili-stat 的契约（/retro 统一调
 `run.sh ... video ...`）；对 LinkedIn 而言"video"即一条帖子。
 """
 from __future__ import annotations

@@ -132,4 +132,4 @@ def fetch_all(bvid: str, max_comments: int = 50) -> dict:
 if __name__ == "__main__":
     # 与 douyin-session / xhs-explore 的接口保持一致；B站公开数据无需登录。
     if len(sys.argv) > 1 and sys.argv[1] == "login":
-        print("[B站] 视频数据与评论均为公开接口，无需登录，直接 /cheat-retro 即可。")
+        print("[B站] 视频数据与评论均为公开接口，无需登录，直接 /retro 即可。")

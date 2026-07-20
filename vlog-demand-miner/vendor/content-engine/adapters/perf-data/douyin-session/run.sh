@@ -2,7 +2,7 @@
 #
 # douyin-session adapter wrapper
 #
-# Called by /cheat-retro when state.data_collection=adapter and platform=douyin.
+# Called by /retro when state.data_collection=adapter and platform=douyin.
 #
 # Usage:
 #   bash run.sh <aweme_id> <video_folder> [<script_path>]
@@ -33,13 +33,13 @@ ADAPTER_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd 
 
 # Find Python — prefer venv in user's project root if exists
 PYTHON=""
-# Walk up from VIDEO_FOLDER to find project root (.cheat-state.json)
+# Walk up from VIDEO_FOLDER to find project root (.nexttake-state.json)
 PROJECT_ROOT="$( realpath "$VIDEO_FOLDER" )"
-while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; do
+while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; do
   PROJECT_ROOT="$( dirname "$PROJECT_ROOT" )"
 done
-if [[ ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; then
-  echo "❌ Cannot find project root (.cheat-state.json) from $VIDEO_FOLDER" >&2
+if [[ ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; then
+  echo "❌ Cannot find project root (.nexttake-state.json) from $VIDEO_FOLDER" >&2
   exit 3
 fi
 if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
@@ -63,7 +63,7 @@ Install in your project venv:
   pip install -r "$ADAPTER_DIR/requirements.txt"
   playwright install chromium
 
-Then re-run /cheat-retro.
+Then re-run /retro.
 EOF
   exit 2
 fi
@@ -95,11 +95,11 @@ fi
 
 # Run from PROJECT_ROOT so .auth/ is found and outputs go to expected paths
 cd "$PROJECT_ROOT"
-export CHEAT_PROJECT_ROOT="$PROJECT_ROOT"
+export NEXTTAKE_PROJECT_ROOT="$PROJECT_ROOT"
 
 # Override VIDEOS_DIR via env var so review.py writes to user's videos/ not its own
 # (review.py uses ROOT/videos by default; we override to use user's project)
-export CHEAT_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
+export NEXTTAKE_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
 
 echo "[douyin-session] fetching aweme_id=$AWEME_ID into $VIDEO_FOLDER"
 if [[ -n "$SCRIPT_ARG" ]]; then

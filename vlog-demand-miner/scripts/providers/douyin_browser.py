@@ -41,7 +41,6 @@ VIDEO_ID = re.compile(r"/video/(\d+)")
 SKILL_ROOT = Path(__file__).resolve().parents[2]
 CONTENT_ENGINE_ROOT = Path(
     os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
-    or os.getenv("VDM_CHEAT_ROOT")
     or str(SKILL_ROOT / "vendor" / "content-engine")
 ).expanduser().resolve()
 DEFAULT_UPSTREAM_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
@@ -55,7 +54,6 @@ def upstream_adapter_dir(value: str | Path | None) -> Path:
     selected = Path(
         value
         or os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR")
-        or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR")
         or DEFAULT_UPSTREAM_ADAPTER
     ).expanduser().resolve()
     if not (selected / "crawler.py").is_file():
@@ -64,7 +62,7 @@ def upstream_adapter_dir(value: str | Path | None) -> Path:
 
 
 def load_upstream_crawler(adapter_dir: Path) -> Any:
-    module_name = "vdm_cheat_douyin_session"
+    module_name = "vdm_nexttake_douyin_session"
     if module_name in sys.modules:
         return sys.modules[module_name]
     previous_paths = sys.modules.pop("paths", None)
@@ -125,14 +123,14 @@ class BrowserProvider:
     async def __aenter__(self) -> "BrowserProvider":
         self.profile_dir.mkdir(parents=True, exist_ok=True)
         self.profile_dir.chmod(0o700)
-        self.previous_upstream_root = os.environ.get("CHEAT_PROJECT_ROOT")
-        os.environ["CHEAT_PROJECT_ROOT"] = str(self.profile_dir)
+        self.previous_upstream_root = os.environ.get("NEXTTAKE_PROJECT_ROOT")
+        os.environ["NEXTTAKE_PROJECT_ROOT"] = str(self.profile_dir)
         try:
             self.adapter_dir = upstream_adapter_dir(self.upstream_adapter_dir)
             self.crawler = load_upstream_crawler(self.adapter_dir)
             self.playwright = await async_playwright().start()
             # This is the exact persistent profile location expected by the
-            # upstream cheat-on-content douyin-session adapter.
+            # upstream NextTake Content Engine douyin-session adapter.
             options = {"user_data_dir": str(self.profile_dir / ".auth"), "headless": self.headless,
                        "viewport": {"width": 1440, "height": 960}}
             try:
@@ -162,9 +160,9 @@ class BrowserProvider:
 
     def _restore_upstream_root(self) -> None:
         if self.previous_upstream_root is None:
-            os.environ.pop("CHEAT_PROJECT_ROOT", None)
+            os.environ.pop("NEXTTAKE_PROJECT_ROOT", None)
         else:
-            os.environ["CHEAT_PROJECT_ROOT"] = self.previous_upstream_root
+            os.environ["NEXTTAKE_PROJECT_ROOT"] = self.previous_upstream_root
 
     def _schedule_overlay_dismissal(self, page: Any) -> None:
         task = asyncio.create_task(self._dismiss_known_overlays(page))
@@ -234,7 +232,7 @@ class BrowserProvider:
                           "like_count": positive_int(raw.get("digg_count")),
                           "reply_count": positive_int(raw.get("reply_comment_total")),
                           "created_at": raw.get("create_time")}
-            # cheat-on-content deliberately exposes no raw account identifier
+            # NextTake Content Engine deliberately exposes no raw account identifier
             # in this public-page path. Use the display name only when present
             # and disclose the collision risk instead of treating each comment
             # as a different person.
@@ -338,19 +336,19 @@ async def main(args: argparse.Namespace) -> int:
         if args.command == "login":
             adapter_dir = upstream_adapter_dir(args.upstream_adapter_dir)
             crawler = load_upstream_crawler(adapter_dir)
-            previous_root = os.environ.get("CHEAT_PROJECT_ROOT")
+            previous_root = os.environ.get("NEXTTAKE_PROJECT_ROOT")
             profile_dir = args.profile_dir.expanduser().resolve()
             profile_dir.mkdir(parents=True, exist_ok=True)
             profile_dir.chmod(0o700)
-            os.environ["CHEAT_PROJECT_ROOT"] = str(profile_dir)
+            os.environ["NEXTTAKE_PROJECT_ROOT"] = str(profile_dir)
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     logged_in = await crawler.ensure_login(max(1, min(args.wait_seconds, 900)))
             finally:
                 if previous_root is None:
-                    os.environ.pop("CHEAT_PROJECT_ROOT", None)
+                    os.environ.pop("NEXTTAKE_PROJECT_ROOT", None)
                 else:
-                    os.environ["CHEAT_PROJECT_ROOT"] = previous_root
+                    os.environ["NEXTTAKE_PROJECT_ROOT"] = previous_root
             emit("ok" if logged_in else "blocked_auth", {"action": "manual_login_completed" if logged_in else "manual_login_incomplete"})
             return 0 if logged_in else 2
         async with BrowserProvider(args.profile_dir, args.headless, args.upstream_adapter_dir, (os.environ.get(args.commenter_hmac_key_env, "").encode() if args.commenter_hmac_key_env else None) or None) as provider:
@@ -374,7 +372,7 @@ async def main(args: argparse.Namespace) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile-dir", type=Path, required=True)
-    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or str(DEFAULT_UPSTREAM_ADAPTER)
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or str(DEFAULT_UPSTREAM_ADAPTER)
     parser.add_argument("--upstream-adapter-dir", type=Path, default=adapter_default)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--commenter-hmac-key-env")

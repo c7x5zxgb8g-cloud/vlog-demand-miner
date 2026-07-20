@@ -1,11 +1,11 @@
 ---
-name: cheat-retro
+name: retro
 description: T+N 天数据回收 + 复盘 + 把实绩观察写入 rubric-memo.md。这是校准循环的反馈环节——不复盘的预测等于占星。触发词："复盘 [path]"/"retro this"/"T+3d 数据来了"/"抓数据 [path]"/"把这篇复盘了"。
 argument-hint: <prediction-file> [— window: 3|5|7] [— source: manual|adapter]
 allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
 ---
 
-# /cheat-retro — 数据回收与复盘
+# /retro — 数据回收与复盘
 
 抓 T+N 天的实际表现 → 对比预测 → 提炼新观察 → 写入 rubric-memo.md。**只追加 `## 复盘` 段，绝不改预测段**。`rubric_notes.md` 是 blind 白名单，只能保存通用公式、维度定义和抽象规则，不能写入样本名、实绩、评论、链接或播放/阅读数。
 
@@ -28,31 +28,31 @@ allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
   ↓
 [Phase 6: 写入 rubric-memo.md 的"观察记录"段]
   ↓
-[Phase 7: 检测是否触发 bump 候选 → 提示用户跑 /cheat-bump]
+[Phase 7: 检测是否触发 bump 候选 → 提示用户跑 /calibrate]
 ```
 
 ## Constants
 
 - **RETRO_WINDOW_DAYS = 3** — 默认 T+3d。短视频快平台可设 1，长文设 7
 - **DATA_SOURCE = manual** — manual: 用户粘数字；adapter: 调对应平台 adapter（需配置）
-- **AUTO_PROPOSE_BUMP = true** — Claude 判断是否系统性偏差时自动提议 /cheat-bump
+- **AUTO_PROPOSE_BUMP = true** — Claude 判断是否系统性偏差时自动提议 /calibrate
   - **默认参考**：连续 ≥3 次同向偏差（high/low）→ 提议
   - **但 Claude 可以更早提议**：1 次极端偏差（如中枢 50w 实绩 5w 这种 ≥10x），即使没有"连续"也提议
   - **也可以更晚**：3 次同向但每次偏差都很小（<25%），可能只是噪声不是系统性
 - **TOP_COMMENTS_N = 20** — 抓 / 粘 top N 高赞评论
 
-> 💡 调用时覆盖：`/cheat-retro <file> — window: 7 — source: adapter`
+> 💡 调用时覆盖：`/retro <file> — window: 7 — source: adapter`
 
 ## Inputs
 
 | 必填 | 来源 |
 |---|---|
-| `<prediction-file>` 或 `<video-folder>` | 用户参数；缺失则从 `.cheat-state.json` 的 `pending_retros[0]` |
+| `<prediction-file>` 或 `<video-folder>` | 用户参数；缺失则从 `.nexttake-state.json` 的 `pending_retros[0]` |
 | `rubric_notes.md` | 用户项目根（只读，用于当前规则上下文；不得写入实绩观察） |
 | `rubric-memo.md` | 用户项目根（写入复盘观察、实绩证据、样本名与评论信号） |
-| `.cheat-state.json` | 状态文件 |
+| `.nexttake-state.json` | 状态文件 |
 
-### 入参解析（同 cheat-predict 双形态接受）
+### 入参解析（同 predict 双形态接受）
 
 用户给的可能是：
 - **`predictions/2026-05-04_<id>_<short>.md`** → 直接用这个 prediction 文件
@@ -68,7 +68,7 @@ allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
    - 取**最后一个**`## 预测 vN` 作为本次校准的依据（v2 存在则用 v2；只有 v1 则用 v1；legacy 单段 `## 预测` 直接用）
    - state.shoots 对应项的 `v2_prediction_written` 应与"是否存在 v2 段"一致——不一致则警告（state 与文件脱节）
 3. **校验 immutability**：在内存 cache 住所有 `## 预测...` 段的内容（用于 Phase 5 后核对——**全部段不可改**，不只是有效段）
-4. 校验文件 header 有 `Published at` → 没登记的不能复盘，提示用户先 `/cheat-publish`
+4. 校验文件 header 有 `Published at` → 没登记的不能复盘，提示用户先 `/publish`
 5. 校验时间窗口：今天 - published_at >= RETRO_WINDOW_DAYS。不够 → 提示"还差 X 天"，询问用户是否仍坚持复盘（标 `early_retro: true`）
 6. 校验已有复盘段是否已填——已填则询问"是补充还是修正？"
    - 补充 → 在已有复盘段下追加新子段，标日期
@@ -100,13 +100,13 @@ allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
 | `bilibili` | `adapters/perf-data/bilibili-stat/` | `bash <adapters-dir>/bilibili-stat/run.sh <bvid> <video_folder>` |
 | 其他 | 无 adapter | 优雅降级到 Path A |
 
-> `<adapters-dir>` = 克隆源码处的 `cheat-on-content/adapters/perf-data/`（install.sh **不**复制 adapter 到 ~/.claude/skills，只复制 15 个 skill）。定位：`find ~ -path '*/cheat-on-content/adapters/perf-data' -type d | head -1`。
+> `<adapters-dir>` = NextTake Skill 根目录下的 `vendor/content-engine/adapters/perf-data/`。也可通过 `NEXTTAKE_CONTENT_ENGINE_ROOT` 显式指定完整内容引擎目录。
 
 **douyin-session 的特殊处理**：
 - 视频 URL（如 `https://v.douyin.com/abc123`）→ 短链解析 → 提取 aweme_id
 - 调用前确认 cookie 文件存在（adapter 会找 `.auth/`）；不存在则提示用户先跑 `python <adapter>/crawler.py login`
 - adapter 输出在 `<video_folder>/report.md`（adapter 的 renderer.py 已经按这个格式写）
-- cheat-retro 读这个 report.md 解析关键数据 → 摘要写入 prediction 的复盘段
+- retro 读这个 report.md 解析关键数据 → 摘要写入 prediction 的复盘段
 
 **xhs-explore 的特殊处理**：
 - 笔记 URL（`https://www.xiaohongshu.com/explore/<note_id>?xsec_token=...` 或 `https://xhslink.com/xxx`）→ 提取 note_id
@@ -117,7 +117,7 @@ allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
 **linkedin-session 的特殊处理**：
 - 帖子 URL（`https://www.linkedin.com/feed/update/urn:li:activity:<id>/`）或裸 activity_id → adapter 自动提取 activity_id
 - 调用前确认 cookie 存在（adapter 找 `.auth-linkedin/`）；不存在则提示先跑 `python <adapter>/crawler.py login`
-- **只能抓你本人发的帖子**（LinkedIn 单帖分析仅作者可见）；LinkedIn 界面 日/英 随机切换，`extract.py` 的 `POST_METRICS` 已存双语标签，万一某项为 None 看 `.cheat-cache/linkedin-session-debug/post_<id>.txt` 把新标签补进去
+- **只能抓你本人发的帖子**（LinkedIn 单帖分析仅作者可见）；LinkedIn 界面 日/英 随机切换，`extract.py` 的 `POST_METRICS` 已存双语标签，万一某项为 None 看 `.nexttake-cache/linkedin-session-debug/post_<id>.txt` 把新标签补进去
 - **评论只给数、不给正文**（分析页限制）→ report.md 标注 → **降级要求用户 manual 粘 top 评论**（评论是真信号，不能省）
 
 **bilibili-stat 的特殊处理**：
@@ -195,7 +195,7 @@ allowed-tools: Bash(*), Read, Edit, Write, Glob, Grep, Skill
 
 #### 4b. 写作 Pattern 观察（写入 script_patterns.md）
 
-Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写）vs `videos/<id>/script.md`（实际拍摄稿——cheat-shoot 时用户提供的版本），找出**改动且对流量有明显影响**的部分：
+Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 ideate 写或用户写）vs `videos/<id>/script.md`（实际拍摄稿——shoot 时用户提供的版本），找出**改动且对流量有明显影响**的部分：
 
 | 用户做了什么 | 流量影响 | 是否提议追加 pattern |
 |---|---|---|
@@ -226,7 +226,7 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 > - script_patterns.md 学的是"什么写法真的能起作用"
 > 可能有交叉（如 MS 维度与"互动钩子" pattern），但记录在两个文件里是因为**作用域不同**——rubric 改了影响所有未来打分，pattern 改了影响所有未来 draft。
 
-如果 `videos/<id>/script.md` **缺失**（cheat-shoot 时用户标 `script_lost`） → 跳过 4b，没法 diff。
+如果 `videos/<id>/script.md` **缺失**（shoot 时用户标 `script_lost`） → 跳过 4b，没法 diff。
 如果 `script_consistency = "consistent"`（用户拍时没改稿）→ 4b 仍然有意义（diff 也许是空），但可以快速跳过细查。
 如果 `script_consistency = "modified"`（用户拍时改了）→ **4b 是核心**，重点学这次改动 → 流量影响。
 
@@ -272,7 +272,7 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 - 详见：[predictions/<file>.md]
 ```
 
-**检测跨样本 pattern**：扫描 `rubric-memo.md` 已有"观察记录"，看新观察是否与某条已有观察形成 ≥2 样本支持。命中则在 `rubric-memo.md` 升级到"重大跨样本观察"段。只有在后续 `/cheat-bump` 落地时，才把已验证的规律抽象成通用语言写入 `rubric_notes.md`。
+**检测跨样本 pattern**：扫描 `rubric-memo.md` 已有"观察记录"，看新观察是否与某条已有观察形成 ≥2 样本支持。命中则在 `rubric-memo.md` 升级到"重大跨样本观察"段。只有在后续 `/calibrate` 落地时，才把已验证的规律抽象成通用语言写入 `rubric_notes.md`。
 
 #### 6b. script_patterns.md（Phase 4b 的输出，**用户确认后才写**）
 
@@ -300,7 +300,7 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 
 ### Phase 7: 检测 bump 触发
 
-读 `.cheat-state.json` 的 `consecutive_directional_errors` 字段，按本次复盘判定向更新：
+读 `.nexttake-state.json` 的 `consecutive_directional_errors` 字段，按本次复盘判定向更新：
 - 本次预测高估（实绩 < 中枢 -25%） → push `["high"]` + 记录 deviation_magnitude（如 0.5x / 0.3x）
 - 本次预测低估（实绩 > 中枢 +25%） → push `["low"]` + 记录 deviation_magnitude
 - 在 ±25% 内 → 不 push
@@ -332,8 +332,8 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 [简短描述：连续 N 次 / 1 次极端 / 评论双信号 等]
 
 这可能是 rubric 系统性偏差的信号。建议：
-- 跑 /cheat-bump 看是否需要升级公式
-- 或先看 /cheat-status 详细分析
+- 跑 /calibrate 看是否需要升级公式
+- 或先看 /status 详细分析
 
 注：本次提议是 [default-aligned: 满足 ≥3 同向] / [judgment-driven: 1 次 10x 强偏差]
 ```
@@ -353,7 +353,7 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 1. **预测段 immutable**。Phase 0 cache + Phase 5 校验是双保险。任何 hash 不一致 → 报错回滚
 2. **数据来源必须标注**。`数据来源: manual paste` 或 `数据来源: adapter:douyin-session` 写进复盘段
 3. **观察可追溯**。每条新观察引用具体数据点
-4. **不在复盘里 bump**。Phase 7 只**提议** bump，实际升级走 `/cheat-bump`——避免一次操作做两件事
+4. **不在复盘里 bump**。Phase 7 只**提议** bump，实际升级走 `/calibrate`——避免一次操作做两件事
 5. **早复盘标记**。RETRO_WINDOW_DAYS 不到就复盘 → state file 记 `early_retro: true`，bump 时这种样本权重降级
 
 ## Refusals
@@ -361,12 +361,12 @@ Diff `scripts/<id>.md`（pre-shoot 草稿，可能是 cheat-seed 写或用户写
 - 「这条数据已经看过了，但你假装没看，按预测时的盲度做复盘」 → 复盘本来就是看完数据再做的；这个表述本身没有违规，但要确认用户没在 prediction 写之前透露过数据
 - 「把预测段的概率分布改一下，让复盘看起来更准」 → 拒绝。原则 #1
 - 「跳过观察提炼，直接结束」 → 拒绝。新观察是 rubric 进化的唯一燃料；缺它复盘退化为"看一眼"
-- 「直接 bump，不要单独走 /cheat-bump」 → 拒绝。bump 流程有完整的跨模型审 + cleanup pass，retro 是触发器不是执行器
+- 「直接 bump，不要单独走 /calibrate」 → 拒绝。bump 流程有完整的跨模型审 + cleanup pass，retro 是触发器不是执行器
 
 ## Integration
 
-- 前置：`/cheat-publish` 已登记 + 时间窗口达到
-- 下游：累计 `consecutive_directional_errors` 满 3 → 触发 `/cheat-bump` 提议
-- 状态字段更新：`calibration_samples` +1（这是 cheat-status 显示进度的关键）
+- 前置：`/publish` 已登记 + 时间窗口达到
+- 下游：累计 `consecutive_directional_errors` 满 3 → 触发 `/calibrate` 提议
+- 状态字段更新：`calibration_samples` +1（这是 status 显示进度的关键）
 - pending_retros：剔除本条
 - 与 [observation-lifecycle.md](../../shared-references/observation-lifecycle.md) 紧耦合：每次复盘是观察新增的入口

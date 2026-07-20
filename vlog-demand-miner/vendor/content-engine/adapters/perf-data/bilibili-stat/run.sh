@@ -2,7 +2,7 @@
 #
 # bilibili-stat adapter wrapper
 #
-# Called by /cheat-retro when state.data_collection=adapter and platform=bilibili.
+# Called by /retro when state.data_collection=adapter and platform=bilibili.
 #
 # Usage:
 #   bash run.sh <bvid_or_url> <video_folder> [<script_path>]
@@ -35,13 +35,13 @@ ADAPTER_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd 
 
 # Find Python — prefer venv in user's project root if exists
 PYTHON=""
-# Walk up from VIDEO_FOLDER to find project root (.cheat-state.json)
+# Walk up from VIDEO_FOLDER to find project root (.nexttake-state.json)
 PROJECT_ROOT="$( realpath "$VIDEO_FOLDER" )"
-while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; do
+while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; do
   PROJECT_ROOT="$( dirname "$PROJECT_ROOT" )"
 done
-if [[ ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; then
-  echo "❌ Cannot find project root (.cheat-state.json) from $VIDEO_FOLDER" >&2
+if [[ ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; then
+  echo "❌ Cannot find project root (.nexttake-state.json) from $VIDEO_FOLDER" >&2
   exit 3
 fi
 if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
@@ -63,7 +63,7 @@ if ! "$PYTHON" -c "import httpx" 2>/dev/null; then
 Install:
   pip install -r "$ADAPTER_DIR/requirements.txt"
 
-Then re-run /cheat-retro.
+Then re-run /retro.
 EOF
   exit 2
 fi
@@ -79,8 +79,8 @@ fi
 
 # Run from PROJECT_ROOT so outputs go to expected paths; override videos dir to user's
 cd "$PROJECT_ROOT"
-export CHEAT_PROJECT_ROOT="$PROJECT_ROOT"
-export CHEAT_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
+export NEXTTAKE_PROJECT_ROOT="$PROJECT_ROOT"
+export NEXTTAKE_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"  # = user's videos/
 
 echo "[bilibili-stat] fetching $BVID into $VIDEO_FOLDER"
 if [[ -n "$SCRIPT_ARG" ]]; then
@@ -89,7 +89,7 @@ else
   "$PYTHON" "$ADAPTER_DIR/review.py" video "$BVID"
 fi
 
-# review.py writes to CHEAT_VIDEOS_DIR/<auto-named-folder>/report.md (named by title).
+# review.py writes to NEXTTAKE_VIDEOS_DIR/<auto-named-folder>/report.md (named by title).
 # Move it into our canonical video_folder if names differ.
 LATEST_REPORT=$(find "$( dirname "$VIDEO_FOLDER" )" -name "report.md" -newer "$VIDEO_FOLDER" -type f 2>/dev/null | head -1)
 if [[ -n "$LATEST_REPORT" && "$( dirname "$LATEST_REPORT" )" != "$VIDEO_FOLDER" ]]; then

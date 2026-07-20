@@ -44,7 +44,7 @@ class CreatorReportTests(unittest.TestCase):
             self.assertIn("本次研究共发现 1 个内容机会", html)
             self.assertNotIn("团播试点", html)
             self.assertEqual(html.count("data-copy="), 2)
-            for internal in ("原生 cheat-on-content 工作流", "VDM source pack", "Immutable section hash", "Article ID", "Script Path", "CMT-", "OPP-", "L1_demand_signal"):
+            for internal in ("原生 NextTake Content Engine 工作流", "VDM source pack", "Immutable section hash", "Article ID", "Script Path", "CMT-", "OPP-", "L1_demand_signal"):
                 self.assertNotIn(internal, html)
 
     def test_script_display_keeps_title_and_body_only(self) -> None:

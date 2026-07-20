@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# cheat-on-content / meta-logging hook
+# NextTake Content Engine / meta-logging hook
 #
 # Passive event recorder. Writes one JSON line per event to
-# .cheat-cache/usage.jsonl in the project root. Never blocks (async fire-and-forget).
+# .nexttake-cache/usage.jsonl in the project root. Never blocks (async fire-and-forget).
 #
-# Used by /cheat-status to compute:
-#   - "distance since last bump" (count of cheat-predict invocations after last_bump_at)
+# Used by /status to compute:
+#   - "distance since last bump" (count of predict invocations after last_bump_at)
 #   - skill invocation frequency
 #   - tool failure patterns
 #
@@ -14,12 +14,12 @@
 #   <event_type> ∈ {tool_use, user_prompt, session_start, session_end}
 #
 # Reads from stdin: Claude Code's hook payload JSON
-# Output: appends one line to .cheat-cache/usage.jsonl
+# Output: appends one line to .nexttake-cache/usage.jsonl
 
 set -uo pipefail
 
 event_type="${1:-unknown}"
-cache_dir="${CLAUDE_PROJECT_DIR:-.}/.cheat-cache"
+cache_dir="${CLAUDE_PROJECT_DIR:-.}/.nexttake-cache"
 log_file="${cache_dir}/usage.jsonl"
 
 mkdir -p "$cache_dir" 2>/dev/null || exit 0  # never block on permission errors

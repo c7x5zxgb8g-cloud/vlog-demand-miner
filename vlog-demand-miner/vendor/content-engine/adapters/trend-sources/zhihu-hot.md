@@ -1,15 +1,15 @@
 # Adapter: zhihu-hot（知乎热榜）
 
-被以下 skill 调用：`cheat-seed` Phase 2a、`cheat-trends`。
+被以下 skill 调用：`ideate` Phase 2a、`trends`。
 
-> **当前状态**：schema only。实际 fetch 实现归 batch 3。/cheat-seed 在 stub 期由 Claude 通过 `WebFetch` 直接抓取（见下方"过渡期实现"）。
+> **当前状态**：schema only。实际 fetch 实现归 batch 3。/ideate 在 stub 期由 Claude 通过 `WebFetch` 直接抓取（见下方"过渡期实现"）。
 
 ---
 
 ## 适用场景
 
-- **`cheat-seed` 默认 source 之一**——cold-start 用户的第一次选题种子
-- **`cheat-trends` 可选 source**——日常补充候选池
+- **`ideate` 默认 source 之一**——cold-start 用户的第一次选题种子
+- **`trends` 可选 source**——日常补充候选池
 
 最贴合：论说 / 议题讨论 / 知识科普类观点视频。知乎话题平均比微博更"可讨论"——一个标题就含问题与立场，省了 brainstorm 一半工。
 
@@ -50,11 +50,11 @@ fetch(limit: int = 50) -> List[Candidate]
 
 ★★★★ — 知乎 API 比微博稳定；JSON 端点改动频率低于微博 HTML。
 
-建议节流：`/cheat-seed` 默认每用户每天 ≤ 3 次抓取。
+建议节流：`/ideate` 默认每用户每天 ≤ 3 次抓取。
 
 ## 过渡期实现（stub）
 
-在 batch 3 写专用 adapter 前，`/cheat-seed` 通过 `WebFetch`：
+在 batch 3 写专用 adapter 前，`/ideate` 通过 `WebFetch`：
 
 ```
 WebFetch("https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&desktop=true",
@@ -73,7 +73,7 @@ WebFetch("https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50&de
 
 ## 风险提示
 
-- 知乎热榜偶现政治敏感议题——/cheat-seed Phase 1 Q3 的"红线"过滤必要
+- 知乎热榜偶现政治敏感议题——/ideate Phase 1 Q3 的"红线"过滤必要
 - 部分热榜话题已被知乎大 V 高密度覆盖，做视频时差异化不易——粗打分时建议提示用户"该话题已饱和，需要差异化角度"
 
 ## 相关 adapter

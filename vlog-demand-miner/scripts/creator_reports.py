@@ -1,4 +1,4 @@
-"""Safe, read-only Creator Studio projection for native cheat projects."""
+"""Safe, read-only Creator Studio projection for NextTake creator projects."""
 from __future__ import annotations
 
 import hashlib

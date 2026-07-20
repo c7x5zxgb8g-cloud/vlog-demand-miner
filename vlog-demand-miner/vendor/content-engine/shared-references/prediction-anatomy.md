@@ -1,6 +1,6 @@
 # Prediction Anatomy（预测日志解剖）
 
-被这些子 skill 引用：`cheat-predict`、`cheat-retro`、`templates/prediction.template.md`。
+被这些子 skill 引用：`predict`、`retro`、`templates/prediction.template.md`。
 
 **所有预测都用统一格式**——7 个必备组件 + 复盘段。Confidence 等级（基于 `calibration_samples` 派生，见 [state-management.md](state-management.md) 的 confidence 表）作为 header 字段标注，告诉用户这次预测有多可信，**但不改变预测格式本身**。
 
@@ -58,14 +58,14 @@
 - `Rubric Version` 必填——将来 v3 时代回看 v2 预测，没有版本号就无法公平对比
 - `预测时数据状态` 必填——明确声明 blind 是 immutable 承诺的前提
 - `Script Path` 必填——指向 `scripts/<id>.md`（pre-shoot 草稿）
-- `Script Hash` 必填——cheat-shoot 时再 hash `videos/<id>/script.md`，不一致 → 复盘段加 integrity warning
+- `Script Hash` 必填——shoot 时再 hash `videos/<id>/script.md`，不一致 → 复盘段加 integrity warning
 - `Calibration Samples` + `Confidence` 必填——告诉读者这次预测有多可信。**Confidence 自动派生**自 calibration_samples（见 state-management.md）
 - `Prediction Basis` 必填——`pre_shoot` 为标准盲预测；`post_shoot_pre_publish` 为 v2 拍后改稿重判（仍未见数据，但软盲）
 - `Scored By` 必填——告诉读者这次预测是 Claude 全自动还是用户介入改过：
   - `claude`：Claude 主动打分 + bucket + 概率，用户 review 后回 "ok" 接受
   - `claude+user_override`：用户在 review 阶段挑刺改了某些字段
 - **`BlindScored By` 必填**——本次维度分由谁打：
-  - `subagent-v1`：通过 Task tool 调 cheat-score-blind sub-agent 拿到的盲打分（默认，Phase 2 路径）
+  - `subagent-v1`：通过 Task tool 调 score-blind sub-agent 拿到的盲打分（默认，Phase 2 路径）
   - `main-claude-self`：用户 `--skip-blind` flag 或 Phase 2.5 选 b（信主 Claude 自估）——同时 `state.last_prediction_self_scored=true`
   - `mixed`：Phase 2.5 用户选 c 给个别维度自定分，其他维度仍走 sub-agent
 - **`BlindScore Disagreement` 必填**——上方 JSON。**所有维度必记**（即使 delta=0），不允许"只记差异大的"。理由：复盘时按 delta 分布分析"哪类维度 sub-agent 与主 Claude 系统性分歧"是 rubric 演进的重要信号
@@ -89,7 +89,7 @@
 - **节奏**：比草稿 [紧 / 松] 约 N%
 ```
 
-> 如果是用户从零写的（没用 cheat-seed），这一段写"用户原创稿，无 Claude 草稿对照"。
+> 如果是用户从零写的（没用 ideate），这一段写"用户原创稿，无 Claude 草稿对照"。
 
 ---
 
@@ -282,7 +282,7 @@ file: predictions/YYYY-MM-DD_<id>_<short>.md
 ## 关键校准假设                 ← 组件 7
 （这次预测作为实验的明确赌注）
 
-## 预测 v2 (replaces v1)        ← (可选) 拍后改稿 ≥30% 时由 cheat-shoot 触发，append 不覆盖
+## 预测 v2 (replaces v1)        ← (可选) 拍后改稿 ≥30% 时由 shoot 触发，append 不覆盖
 （同 7 组件结构 + 头部含 Diff vs v1 摘要）
 
 ## 复盘                         ← 仅追加，IMMUTABLE 边界
@@ -291,11 +291,11 @@ file: predictions/YYYY-MM-DD_<id>_<short>.md
 
 ### v1 / v2 段约定
 
-- **新建文件**：cheat-predict 写 `## 预测 v1`（不再裸 `## 预测`——为 v2 留 schema 一致性）
-- **legacy 兼容**：v0.1.0 时期写的 `## 预测` 文件不动；hook 与 cheat-retro 都识别
-- **v2 触发条件**：cheat-shoot 检测拍摄稿与 `scripts/<id>.md` 的 line-diff ≥ 30%（[V2_TRIGGER_THRESHOLD](../skills/cheat-shoot/WORKFLOW.md)），调用 `/cheat-predict — mode: v2 — prediction-file: <path>`
+- **新建文件**：predict 写 `## 预测 v1`（不再裸 `## 预测`——为 v2 留 schema 一致性）
+- **legacy 兼容**：v0.1.0 时期写的 `## 预测` 文件不动；hook 与 retro 都识别
+- **v2 触发条件**：shoot 检测拍摄稿与 `scripts/<id>.md` 的 line-diff ≥ 30%（[V2_TRIGGER_THRESHOLD](../skills/shoot/WORKFLOW.md)），调用 `/predict — mode: v2 — prediction-file: <path>`
 - **append 而非覆盖**：v2 段插在 `## 复盘` 之前。v1 段**绝不**修改（hook 物理强制）
-- **校准用谁**：cheat-retro 读最后一个 `## 预测 vN` 算偏差；v1 留作历史档案
+- **校准用谁**：retro 读最后一个 `## 预测 vN` 算偏差；v1 留作历史档案
 - **diff 学习**：v1 vs v2 的字段差异（如 ER 4→5）就是用户改稿带来的判分变化，是 rubric 升级证据
 
 ### Prediction Basis 字段
@@ -304,17 +304,17 @@ prediction header 必含 `Prediction Basis`：
 - `pre_shoot`（v1 默认，标准盲预测）
 - `post_shoot_pre_publish`（v2，软盲预测——拍后改稿但发布前重判）
 
-cheat-retro 用此字段在 score-curve / bump 校准时区分两条数据线，避免混样。
+retro 用此字段在 score-curve / bump 校准时区分两条数据线，避免混样。
 
 ---
 
 ## 子 skill 验收标准
 
-`cheat-predict` 写完一份预测后，必须自检 7 个组件齐全：
+`predict` 写完一份预测后，必须自检 7 个组件齐全：
 - 组件 5 / 7 在校准样本不足时仍写"N/A 段 + 解释"，**不允许直接跳过**
 - header 的 `Calibration Samples` + `Confidence` 必填——读者一眼看到这次预测多可信
 
-`cheat-retro` 写复盘段时，必须先校验该文件的 7 个组件：
+`retro` 写复盘段时，必须先校验该文件的 7 个组件：
 - 缺组件 → 警告"该 prediction 不规范，复盘价值打折"
 - 复盘段格式与 confidence 等级**无关**——任何阶段复盘都是同一格式
 - diff `Script Hash` 与当前 `videos/<id>/script.md` 的 hash → 不一致则在复盘段加 `**Script changed between predict and shoot**` 警告

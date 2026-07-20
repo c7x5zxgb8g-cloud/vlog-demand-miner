@@ -8,7 +8,7 @@
   我们只被动拦截返回的 JSON。
 - 创作者**自己的**笔记数据走 galaxy 接口（不需要 xsec_token），是最稳的主路。
 - 评论走前台 web API（需要 xsec_token），让页面自己导航触发带 token 的请求；
-  拿不到就优雅降级（report.md 标 comments_unavailable，cheat-retro 回落到 manual 粘评论）。
+  拿不到就优雅降级（report.md 标 comments_unavailable，retro 回落到 manual 粘评论）。
 
 本文件新增的能力（来自 xhs-analytics 的公开页解析）：
 - fetch_public_note: 无登录解析 explore 页面 __INITIAL_STATE__，拿正文 / 图片 / 标签。
@@ -205,7 +205,7 @@ async def fetch_recent_notes(sess: Session, limit: int = 50) -> list[dict]:
         notes = _parse_note_list(captured, limit)
         if not notes:
             _dump(all_urls, "creator_urls.txt", captured, "creator_captured.json")
-            print(f"[诊断] 笔记列表为空，{len(all_urls)} 个请求已 dump 到 .cheat-cache/xhs-explore-debug/。")
+            print(f"[诊断] 笔记列表为空，{len(all_urls)} 个请求已 dump 到 .nexttake-cache/xhs-explore-debug/。")
         return notes
     finally:
         await page.close()

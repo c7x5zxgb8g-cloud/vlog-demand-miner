@@ -1,13 +1,13 @@
 ---
-name: cheat-seed
-description: 跟用户对话讨论选题——**默认一次一个**，用户主动给主题或经历，AI 围绕用户的输入深挖、提炼角度、写一份 draft。不是 AI 拿三个开放问题追用户，也不是一次给 5 个候选。触发词："找选题"/"我想做一条 X"/"最近有个想法"/"seed"/"启动种子"。可选 batch 模式：`/cheat-seed --batch 5` 走旧的 brainstorm 5 候选 + 写 5 draft 流程。
+name: ideate
+description: 跟用户对话讨论选题——**默认一次一个**，用户主动给主题或经历，AI 围绕用户的输入深挖、提炼角度、写一份 draft。不是 AI 拿三个开放问题追用户，也不是一次给 5 个候选。触发词："找选题"/"我想做一条 X"/"最近有个想法"/"seed"/"启动种子"。可选 batch 模式：`/ideate --batch 5` 走旧的 brainstorm 5 候选 + 写 5 draft 流程。
 argument-hint: [— batch: N] [— sources: <comma-separated>]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-seed — 选题对话（默认）/ 批量 brainstorm（可选）
+# /ideate — 选题对话（默认）/ 批量 brainstorm（可选）
 
-cheat-seed 的核心是**跟用户讨论选题**，不是机械地 brainstorm。好内容来自用户的真实经历 + 观察 + 情绪——这些是 AI 不可能凭空 brainstorm 出来的。AI 的角色是**听用户讲 → 帮提炼角度 → 写一份 draft**，不是 dump 15 候选让用户挑。
+ideate 的核心是**跟用户讨论选题**，不是机械地 brainstorm。好内容来自用户的真实经历 + 观察 + 情绪——这些是 AI 不可能凭空 brainstorm 出来的。AI 的角色是**听用户讲 → 帮提炼角度 → 写一份 draft**，不是 dump 15 候选让用户挑。
 
 **默认模式**：对话式一次一个。
 **Batch 模式**（`--batch N`）：保留旧的 brainstorm N 候选 + 写 N 份 draft 流程，给"完全没想法 + 想批量初始化"的用户。
@@ -16,8 +16,8 @@ cheat-seed 的核心是**跟用户讨论选题**，不是机械地 brainstorm。
 
 ```
 Mode A — 用户主动给主题（**最常见**）：
-  用户："/cheat-seed" + 直接说"我想做一条关于 X 的"
-       或："/cheat-seed 我最近开会被领导..."
+  用户："/ideate" + 直接说"我想做一条关于 X 的"
+       或："/ideate 我最近开会被领导..."
   ↓
   AI 围绕 X / 这件事**深挖**——什么瞬间触发？最让你 [情绪 / 不爽 / 觉得有意思] 的是哪点？
   ↓
@@ -41,7 +41,7 @@ Mode C — 用户完全没想法（少见）：
   ↓
   提议 1 个角度（不是 5 个） → 用户认可 → 写 draft
 
-Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
+Batch Mode — 用户显式要批量（`/ideate --batch 5`）：
   按旧版 brainstorm 流程：3 问题 → 15 候选 → 用户挑 → 写 5 draft。
   给"今天想一次性把未来 2 周的选题搞定"的用户。
 ```
@@ -65,17 +65,17 @@ Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
 
 | 必填 | 来源 |
 |---|---|
-| `.cheat-state.json` | 读 calibration_samples / typical_duration / cadence |
+| `.nexttake-state.json` | 读 calibration_samples / typical_duration / cadence |
 | `rubric_notes.md` | 读当前 rubric（粗打分用） |
 | `script_patterns.md` | 读已有 pattern（写 draft 时按 cheat sheet 选结构） |
 | `predictions/*.md`（如有） | 已发历史，brainstorm 时作为 context |
-| `audience.md`（如有） | 受众画像——选题 / 写稿时的"谁在看"镜子（由 `/cheat-persona` 派生） |
+| `audience.md`（如有） | 受众画像——选题 / 写稿时的"谁在看"镜子（由 `/persona` 派生） |
 
 ## Workflow
 
 ### Phase 0: 前置检查 + 加载所有 context（**核心：3 个 context 来源**）
 
-1. 读 `.cheat-state.json` → 不存在则提示先跑 `/cheat-init`
+1. 读 `.nexttake-state.json` → 不存在则提示先跑 `/initialize`
 2. 读 `rubric_notes.md` 拿当前公式（粗打分用）
 3. 读 `script_patterns.md`——写 draft 时按 cheat sheet 选结构
 4. **读已有 prediction 文件**（含 init 时 import 的 reconstructed）作为 **context 来源 A**（用户自己历史）：
@@ -94,7 +94,7 @@ Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
 
 - **A 主导**（用户自己数据）：当 Claude 判断用户数据已能驱动方向时（参考默认：`calibration_samples ≥ 10`，但 Claude 可以更早——如 N=5 但出现 ≥3 个与 benchmark 明显不一致的强样本）
 - **B 主导**（benchmark）：用户数据少 + benchmark 有内容时
-- **B 缺席**（benchmark 为空）+ 用户数据少：纯靠用户 input + 抓热点；明确告诉用户"没 benchmark 也没足够自己数据，建议跑 /cheat-learn-from 后再回来 brainstorm"
+- **B 缺席**（benchmark 为空）+ 用户数据少：纯靠用户 input + 抓热点；明确告诉用户"没 benchmark 也没足够自己数据，建议跑 /learn-from 后再回来 brainstorm"
 
 判断依据**不是死磕样本数**，而是看：
 - 用户最近 N 个样本的实绩**是否与 benchmark 的高表现样本类型一致**——一致说明 benchmark 仍有借鉴价值；不一致说明用户已经走自己的路
@@ -112,7 +112,7 @@ Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
 
 **显式 `--batch N`**（用户主动批量）→ **Batch Mode**
 
-**纯 `/cheat-seed` 无附加内容** → **询问入口问题**：
+**纯 `/ideate` 无附加内容** → **询问入口问题**：
 
 ```
 你今天想干嘛？
@@ -125,7 +125,7 @@ Batch Mode — 用户显式要批量（`/cheat-seed --batch 5`）：
 (我不会拿一堆开放问题追你——你给一句话我就开始)
 ```
 
-注意这是**唯一的开放式问题**——只在用户**纯触发** `/cheat-seed` 时问。如果用户已经在触发词里给了内容（"/cheat-seed 我想做..." 或 "找选题 我最近开会..."），直接进 Mode A/B/C 不再问这一句。
+注意这是**唯一的开放式问题**——只在用户**纯触发** `/ideate` 时问。如果用户已经在触发词里给了内容（"/ideate 我想做..." 或 "找选题 我最近开会..."），直接进 Mode A/B/C 不再问这一句。
 
 ### Phase 2A: Mode A 深挖（用户给了具体 topic / 经历）
 
@@ -263,7 +263,7 @@ Mode A 默认深挖用户经历。但如果**用户讲的本身是时事话题**
 3. 用户挑 N
 4. 写 N 份 draft 到 scripts/——**每份都走 Phase 4 的段落版格式 + Phase 4.5 自检**（line-format + humanizer），不因为批量就跳过
 
-详见 commit history（旧 cheat-seed 的 Phase 1-3）。这是 escape hatch，不是默认。
+详见 commit history（旧 ideate 的 Phase 1-3）。这是 escape hatch，不是默认。
 
 ### Phase 3: 计算 candidate ID + 落候选池
 
@@ -283,7 +283,7 @@ Mode A 默认深挖用户经历。但如果**用户讲的本身是时事话题**
 
 #### ⚠️ 正文必须是段落版，不是字幕格式（**最常见的生成跑偏**）
 
-模型的训练先验会把"视频脚本"默认写成提词器/字幕的短行格式。**这是错的**——cheat-seed 的 draft 是给用户**改写**的散文稿，不是拍摄字幕。字幕是剪映拍后自动断的，不是写作时的形态。
+模型的训练先验会把"视频脚本"默认写成提词器/字幕的短行格式。**这是错的**——ideate 的 draft 是给用户**改写**的散文稿，不是拍摄字幕。字幕是剪映拍后自动断的，不是写作时的形态。
 
 生成正文时，眼睛盯住下面这个对照：
 
@@ -316,8 +316,8 @@ Mode A 默认深挖用户经历。但如果**用户讲的本身是时事话题**
 > 1. **直接在本文件改写**（同 path：scripts/<...>.md）
 >    - 加你的语气、个人经历、真实金句
 >    - 砍铺垫、砍模型缩写、砍学术包装
-> 2. 改完后跑 `/cheat-predict scripts/<本文件>.md`
-> 3. 拍完跑 `/cheat-shoot scripts/<本文件>.md`
+> 2. 改完后跑 `/predict scripts/<本文件>.md`
+> 3. 拍完跑 `/shoot scripts/<本文件>.md`
 
 **Article ID**: <12 位 hash>
 **调性**: [基于讨论得出的，不是清单 Q]
@@ -338,7 +338,7 @@ Mode A 默认深挖用户经历。但如果**用户讲的本身是时事话题**
 
 draft 写完落盘后、**在展示给用户前**跑两步自检。**顺序固定：先 4.5a 修版式，再 4.5b 去 AI 味**——humanizer 处理散文，喂它字幕格式的碎行会乱。
 
-**为什么安全**（不污染校准）：cheat-seed 的 draft 不是被预测/发布的东西——用户改写后、cheat-predict 打分的是**用户最终稿**。这两步只是给用户更干净的起点。
+**为什么安全**（不污染校准）：ideate 的 draft 不是被预测/发布的东西——用户改写后、predict 打分的是**用户最终稿**。这两步只是给用户更干净的起点。
 
 #### Phase 4.5a: line-format 自检（字幕格式 → 段落版）
 
@@ -398,12 +398,12 @@ avg_chars_per_line=$(( char_count / (line_count > 0 ? line_count : 1) ))
 
 > humanizer 那行只在 `HUMANIZE_DRAFT=on` 且 skill 可用时出现。未装时换成一行提示如何启用。
 
-用户说"今天就这样" → 结束 cheat-seed。
+用户说"今天就这样" → 结束 ideate。
 用户给新 topic → 回 Phase 1 重新分流。
 
 ## Key Rules
 
-1. **AI 不主动开放问**——只在用户纯触发 `/cheat-seed` 时问一次入口问题，其他时候**等用户给输入再深挖**
+1. **AI 不主动开放问**——只在用户纯触发 `/ideate` 时问一次入口问题，其他时候**等用户给输入再深挖**
 2. **一次一个选题**——默认 Mode A/B/C 都给 1 个建议；用户主动要批量才走 Batch
 3. **反问纪律**：一次问 1 个，最多 4 轮，用户不耐烦立刻收敛
 4. **深挖围绕用户给的话题**，不要切到别的——你说"开会被领导骂"，AI 不该问"那你最近有没有觉得 AI 让大家..."这种平行话题
@@ -423,10 +423,10 @@ avg_chars_per_line=$(( char_count / (line_count > 0 ? line_count : 1) ))
 
 ## Integration
 
-- 上游：`/cheat-init` Phase 5 末尾在 `pool_status=none + calibration_samples=0` 时主动询问"现在跑 /cheat-seed？"
-- 上游：`/cheat-recommend` 在 candidates 空时引导文案中提及 `/cheat-seed`
-- 上游：`/cheat-status` 在 `pool_status=none + 距 init >24h` 时提示"还没拍——跑 /cheat-seed？"
+- 上游：`/initialize` Phase 5 末尾在 `pool_status=none + calibration_samples=0` 时主动询问"现在跑 /ideate？"
+- 上游：`/recommend` 在 candidates 空时引导文案中提及 `/ideate`
+- 上游：`/status` 在 `pool_status=none + 距 init >24h` 时提示"还没拍——跑 /ideate？"
 - 下游：用户的 candidate → candidates.md（tier1，已 deep_read）
-- 下游：（默认）draft → Phase 4.5 humanizer 去 AI 味 → scripts/<id>.md → 用户改写 → /cheat-predict
-- 可选依赖：[`humanizer`](https://github.com/blader/humanizer) skill（MIT，外部项目）。装在 `~/.claude/skills/humanizer/` 时 Phase 4.5 自动启用；未装则优雅跳过。**不打包进 cheat-on-content**——用户自己 clone
-- 与 `/cheat-trends` 区别：cheat-seed 是**讨论 + 写 draft**（重 conversation）；cheat-trends 是**多 adapter 抓 + 粗打分**（重 fetch）。两者目的不同，不互相替代。
+- 下游：（默认）draft → Phase 4.5 humanizer 去 AI 味 → scripts/<id>.md → 用户改写 → /predict
+- 可选依赖：[`humanizer`](https://github.com/blader/humanizer) skill（MIT，外部项目）。装在 `~/.claude/skills/humanizer/` 时 Phase 4.5 自动启用；未装则优雅跳过。**不打包进 NextTake Content Engine**——用户自己 clone
+- 与 `/trends` 区别：ideate 是**讨论 + 写 draft**（重 conversation）；trends 是**多 adapter 抓 + 粗打分**（重 fetch）。两者目的不同，不互相替代。

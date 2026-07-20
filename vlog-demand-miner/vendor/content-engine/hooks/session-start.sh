@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# cheat-on-content SessionStart hook
+# NextTake Content Engine SessionStart hook
 #
 # Renders a 4-6 line status report at the start of every Claude Code session.
 # Output is added to Claude's system context — Claude sees it before first reply.
 #
 # Silently exits if:
-#   - Not in a cheat-on-content project (no .cheat-state.json)
+#   - Not in a NextTake Content Engine project (no .nexttake-state.json)
 #   - jq not available (status is markdown-readable; Claude can read state.json directly)
 #
 # Format:
@@ -28,9 +28,9 @@ parse_iso_epoch() {
 }
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-STATE_FILE="$PROJECT_DIR/.cheat-state.json"
+STATE_FILE="$PROJECT_DIR/.nexttake-state.json"
 
-# Silently skip if not a cheat-on-content project
+# Silently skip if not a NextTake Content Engine project
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
@@ -38,8 +38,8 @@ fi
 # Skip if jq missing (Claude can still read state.json himself in conversation)
 if ! command -v jq >/dev/null 2>&1; then
   cat <<'EOF'
-[cheat-on-content] SessionStart: jq not installed — skipping auto status report.
-Claude can still read .cheat-state.json directly. Say "状态" for full status.
+[NextTake Content Engine] SessionStart: jq not installed — skipping auto status report.
+Claude can still read .nexttake-state.json directly. Say "状态" for full status.
 EOF
   exit 0
 fi
@@ -63,17 +63,17 @@ last_prediction_self_scored=$(echo "$state" | jq -r '.last_prediction_self_score
 last_self_scored_at=$(echo "$state" | jq -r '.last_self_scored_at // ""')
 
 # --- Detect schema mismatch (read LATEST_SCHEMA from migrations/registry.md if reachable) ---
-# Strategy: hardcode current LATEST_SCHEMA here (bumped by maintainer alongside cheat-init).
+# Strategy: hardcode current LATEST_SCHEMA here (bumped by maintainer alongside initialize).
 # If state.schema_version != LATEST_SCHEMA → suggest migrate (non-blocking).
 LATEST_SCHEMA="1.4"
 schema_mismatch=""
 if [[ "$schema_version" != "$LATEST_SCHEMA" && "$schema_version" != "unknown" ]]; then
-  schema_mismatch="⚠️  schema 版本不一致：state=${schema_version}, skill 期望=${LATEST_SCHEMA}。建议跑 /cheat-migrate（非阻塞，部分新功能可能在迁移前异常）。"
+  schema_mismatch="⚠️  schema 版本不一致：state=${schema_version}, skill 期望=${LATEST_SCHEMA}。建议跑 /migrate（非阻塞，部分新功能可能在迁移前异常）。"
 elif [[ "$schema_version" == "unknown" ]]; then
-  schema_mismatch="⚠️  state.schema_version 字段缺失或损坏。建议跑 /cheat-status 检查文件，或备份后重 init。"
+  schema_mismatch="⚠️  state.schema_version 字段缺失或损坏。建议跑 /status 检查文件，或备份后重 init。"
 fi
 
-# --- Detect blind-skip contamination (cheat-predict --skip-blind 或 Phase 2.5 选 b 触发) ---
+# --- Detect blind-skip contamination (predict --skip-blind 或 Phase 2.5 选 b 触发) ---
 self_scored_warning=""
 if [[ "$last_prediction_self_scored" == "true" && -n "$last_self_scored_at" ]]; then
   # Parse timestamp; tolerate +08:00 or Z suffix
@@ -81,9 +81,9 @@ if [[ "$last_prediction_self_scored" == "true" && -n "$last_self_scored_at" ]]; 
   if [[ $self_scored_epoch -gt 0 ]]; then
     days_since=$(( (now_epoch - self_scored_epoch) / 86400 ))
     if [[ $days_since -ge 7 ]]; then
-      self_scored_warning="🚨 距上次 \`--skip-blind\` 自评预测已 ${days_since} 天——校准池累计的 contamination 风险在叠加。下次 /cheat-predict 走 sub-agent 即可清除此提示。"
+      self_scored_warning="🚨 距上次 \`--skip-blind\` 自评预测已 ${days_since} 天——校准池累计的 contamination 风险在叠加。下次 /predict 走 sub-agent 即可清除此提示。"
     else
-      self_scored_warning="⚠️  上次预测走了 \`--skip-blind\`（${days_since} 天前自评，未经 channel B 隔离）。下次 /cheat-predict 走默认即可清除。"
+      self_scored_warning="⚠️  上次预测走了 \`--skip-blind\`（${days_since} 天前自评，未经 channel B 隔离）。下次 /predict 走默认即可清除。"
     fi
   fi
 fi
@@ -190,7 +190,7 @@ fi
 
 # --- Build the report ---
 echo ""
-echo "[cheat-on-content / SessionStart 状态报告]"
+echo "[NextTake Content Engine / SessionStart 状态报告]"
 echo ""
 echo "$buffer_label"
 echo "$retro_label"

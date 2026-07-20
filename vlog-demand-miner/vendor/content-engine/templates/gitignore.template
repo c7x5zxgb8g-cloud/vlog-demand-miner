@@ -13,12 +13,12 @@
 .auth/
 .auth-xhs/
 .auth-linkedin/
-.cheat-secrets.json
+.nexttake-secrets.json
 
 # ── 本地缓存与生成物 ──
 # NextTake 本地缓存、预测保护脚本和 Adapter 调试输出
-.cheat-cache/
-.cheat-hooks/
+.nexttake-cache/
+.nexttake-hooks/
 .debug/
 
 # ── Claude Code 本地配置（含机器相关路径 / 个人 permission）──

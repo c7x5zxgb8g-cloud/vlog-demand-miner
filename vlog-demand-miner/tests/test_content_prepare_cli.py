@@ -23,7 +23,7 @@ class ContentPrepareCliTests(unittest.TestCase):
             research = root / "research"
             creator = root / "creator"
             creator.mkdir()
-            (creator / ".cheat-state.json").write_text("{}\n", encoding="utf-8")
+            (creator / ".nexttake-state.json").write_text("{}\n", encoding="utf-8")
             code, demo = run(research, "demo")
             self.assertEqual(code, 0)
             code, prepared = run(research, "content-prepare", "--cluster-id", demo["top_cluster"], "--creator-project", str(creator), "--snapshot-at", "2026-07-17")
@@ -55,7 +55,7 @@ class ContentPrepareCliTests(unittest.TestCase):
             research = root / "research"
             creator = root / "creator"
             creator.mkdir()
-            (creator / ".cheat-state.json").write_text("{}\n", encoding="utf-8")
+            (creator / ".nexttake-state.json").write_text("{}\n", encoding="utf-8")
             _, demo = run(research, "demo")
             code, prepared = run(research, "content-prepare", "--cluster-id", demo["top_cluster"], "--creator-project", str(creator))
             self.assertEqual(code, 0)

@@ -1,11 +1,11 @@
 ---
-name: cheat-init
-description: cheat-on-content 的首次 onboarding 与脚手架创建器。统一流程——所有用户都走相同 5 阶段闭环，唯一区别是"发过视频的人"会在 init 时多一步：抓取已有视频建立历史 context（用于后续 cheat-seed 给更贴合的选题、更准的 baseline）。触发词："初始化"/"init"/"首次使用"/"我是新用户"/"setup cheat-on-content"。**必须在用户第一次会话执行；其他子 skill 在 .cheat-state.json 不存在时自动路由到此。**
+name: initialize
+description: NextTake Content Engine 的首次 onboarding 与脚手架创建器。统一流程——所有用户都走相同 5 阶段闭环，唯一区别是"发过视频的人"会在 init 时多一步：抓取已有视频建立历史 context（用于后续 ideate 给更贴合的选题、更准的 baseline）。触发词："初始化"/"init"/"首次使用"/"我是新用户"/"setup NextTake Content Engine"。**必须在用户第一次会话执行；其他子 skill 在 .nexttake-state.json 不存在时自动路由到此。**
 argument-hint: [— form: opinion-video|long-essay|short-text|podcast]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-init — 首次 onboarding
+# /initialize — 首次 onboarding
 
 让用户从零到能跑第一篇预测，全程 ≤ 5 分钟（没发过历史的）或 ≤ 10 分钟（已发过、要 import 历史的）。
 
@@ -45,8 +45,8 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 
 ### Phase 0: 检测当前状态
 
-1. 读用户当前工作目录（**用户的 content project，不是 cheat-on-content 自己**）
-2. 检查是否已存在 `.cheat-state.json`：
+1. 读用户当前工作目录（**用户的 content project，不是 NextTake Content Engine 自己**）
+2. 检查是否已存在 `.nexttake-state.json`：
    - 存在 → 提示"项目似乎已初始化（state file 存在）。要重新初始化会覆盖现有配置——确认？" 等用户明确确认才继续
    - 不存在 → 进入 Phase 1
 3. 检查是否已存在 `rubric_notes.md` / `predictions/` 等核心文件——存在但 state file 不存在 → 是"半初始化"状态，提示用户并询问"要从现有文件推断状态还是重置？"
@@ -56,7 +56,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 向用户输出（一字不漏，不要软化）：
 
 ```
-🎯 Cheat on Content / 网红外挂 — 初始化
+🎯 NextTake Content Engine / 网红外挂 — 初始化
 
 你的下一条内容已经在改写 3 个月后的你。
 规律是客观存在的，区别是你**看见**还是**没看见**。
@@ -76,7 +76,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ```
 
 如果用户答"继续"或类似肯定回应 → Phase 2。
-不再因为 content_form 拒绝继续——任何形态都允许，只是 `rubric_form_mismatch` 字段标真，cheat-status 后续会持续提示用户"你的形态需要 bump 调权重"。
+不再因为 content_form 拒绝继续——任何形态都允许，只是 `rubric_form_mismatch` 字段标真，status 后续会持续提示用户"你的形态需要 bump 调权重"。
 
 ### Phase 2: 6 个问题（一问一答，**不**批量提问）
 
@@ -108,7 +108,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 
 `rubric_form_mismatch` 派生：
 - 选 a → `false`
-- 选 b/c/d/e/f/g → `true`，cheat-status 持续提示"你的形态可能需要 bump 调权重"
+- 选 b/c/d/e/f/g → `true`，status 持续提示"你的形态可能需要 bump 调权重"
 - **不再有"严重不匹配"档**——所有形态都能跑工作流，只是有的 rubric 需要更激进的 bump
 
 **Q1.5: 典型时长**（仅 Q1=a/d/f 时问）
@@ -151,7 +151,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 > "现在装 adapter 自动抓取，还是先手动告诉我？
 > - 现在装 — 引导你装 Playwright + 扫码 → 抓回最近 N 条数据
 > - 等下再装 — 先 manual 模式，state 标 'pending_adapter_setup'，
->            cheat-status 持续提示装"
+>            status 持续提示装"
 
 如选"现在装"→ 走 adapter install 引导（详见各 adapter README）→ 验证抓取可用 → Q2.3。
 如选"等下"→ 跳到 Q2.3 manual。
@@ -177,7 +177,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 >    播放数永远告诉不了你什么内容真的击中了观众。
 > b) **[推荐默认]** adapter 自动抓 — 评论 + 数据全要。
 >    如果你现在没装 adapter，没关系，state 标 'pending_adapter_setup'，
->    第一次 publish 之前装上就行（cheat-status 会持续提醒装）。
+>    第一次 publish 之前装上就行（status 会持续提醒装）。
 >    装的指引在 adapters/perf-data/<platform>/README.md。"
 
 **Q3 → `data_collection` enum 映射**：
@@ -192,7 +192,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 **Q4: 候选选题**
 
 > "你现在有候选选题列表吗？（如有外部 markdown / Notion 维护的）
-> a) 没有（默认）— 一会儿我帮你 brainstorm，或日常用 /cheat-trends 抓
+> a) 没有（默认）— 一会儿我帮你 brainstorm，或日常用 /trends 抓
 > b) 有，markdown 列表
 > c) 有，Notion / 其他"
 
@@ -246,19 +246,19 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
   - 你**已发历史**（Q2=b）→ **可选**——你也可以只用自己历史 calibrate；
     但建议至少导 1 个对标做 sanity check（看你账号是否真的偏离对标方向）
 
-a) 现在找 → 立刻进入 /cheat-learn-from（5-15 分钟，看你材料准备程度）
-b) 等下找 → state 标 `benchmark_status: pending`，cheat-status 持续提醒
+a) 现在找 → 立刻进入 /learn-from（5-15 分钟，看你材料准备程度）
+b) 等下找 → state 标 `benchmark_status: pending`，status 持续提醒
 c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
 
 回 a / b / c。
 ```
 
 行为：
-- 选 a → Phase 3 创建脚手架完毕后，**自动 dispatch 到 /cheat-learn-from**（不让用户手动跑——已经在 init 流程里了）。完成后回 init Phase 4
+- 选 a → Phase 3 创建脚手架完毕后，**自动 dispatch 到 /learn-from**（不让用户手动跑——已经在 init 流程里了）。完成后回 init Phase 4
 - 选 b → state 标 `benchmark_status: pending` + `benchmark_name: null`
 - 选 c → state 标 `benchmark_status: none`
 
-记录到 `benchmark_status` / `benchmark_name`（如 a 选则在 cheat-learn-from 里写入）。
+记录到 `benchmark_status` / `benchmark_name`（如 a 选则在 learn-from 里写入）。
 
 ### Phase 3: 创建脚手架（逐项解释）
 
@@ -268,20 +268,20 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
    ```
    "先创建 .gitignore，把账号凭证挡在版本控制外——这是第一件事。
     .auth/ / .auth-xhs/ / .auth-linkedin/ 存的是抖音 / 小红书 / LinkedIn 的登录态（等同账号密码），
-    .cheat-secrets.json 存 API key / cookie——一旦被 commit 或云同步就等于泄露账号。
+    .nexttake-secrets.json 存 API key / cookie——一旦被 commit 或云同步就等于泄露账号。
     注意：predictions/ videos/ scripts/ 这些**不**忽略——原则 #1/#3 依赖
     git history 作为预测的不可变档案，必须入库。"
    ```
-   - 复制 `cheat-on-content/templates/gitignore.template` → `<user-repo>/.gitignore`
+   - 复制 `content-engine/templates/gitignore.template` → `<user-repo>/.gitignore`
    - 如 `<user-repo>/.gitignore` **已存在** → 不覆盖；逐行检查并**追加缺失行**，至少确保
-     `.auth/`、`.auth-xhs/`、`.auth-linkedin/`、`.cheat-secrets.json` 四行存在
+     `.auth/`、`.auth-xhs/`、`.auth-linkedin/`、`.nexttake-secrets.json` 四行存在
    - 即使用户项目当前**还不是 git 仓库**也照常创建——它会在用户 `git init` 的那一刻立即生效
    - 创建后提醒一句：如果项目已经 `git init` 过且可能误加过 `.auth/`，让用户跑
-     `git rm -r --cached .auth .auth-xhs .auth-linkedin .cheat-secrets.json` 把已暂存的凭证移出
+     `git rm -r --cached .auth .auth-xhs .auth-linkedin .nexttake-secrets.json` 把已暂存的凭证移出
 
-1. **`.cheat-state.json`**
+1. **`.nexttake-state.json`**
    ```
-   "正在创建 .cheat-state.json — 各子 skill 共享上下文的地方。
+   "正在创建 .nexttake-state.json — 各子 skill 共享上下文的地方。
     这次 init 收集的所有答案都会写在这里。"
    ```
    写入（**所有 `<...>` 占位必须查上面 Q 的映射表换成具体 enum 值，绝不直接存字母**）：
@@ -335,20 +335,20 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
     只能含通用语言（公式 / 维度定义 / bucket 边界），不能含真实视频名 / 实绩。
     每次 bump 升级时的 Memo（含证据数据 + 派生证据）写到 rubric-memo.md（下一步创建）。"
    ```
-   - 复制 `cheat-on-content/starter-rubrics/<form>-zero.md`（cold-start）或 `<form>.md`（已有数据时仍可参考）
+   - 复制 `content-engine/starter-rubrics/<form>-zero.md`（cold-start）或 `<form>.md`（已有数据时仍可参考）
 
-2.5. **`rubric-memo.md`**（**新**——配合 cheat-score-blind 隔离协议）
+2.5. **`rubric-memo.md`**（**新**——配合 score-blind 隔离协议）
    ```
    "正在创建 rubric-memo.md — bump 升级 Memo 累积档案。
-    这是 cheat-bump Phase 5 写入 Memo 全文（含真实视频名 + 实绩 + 派生证据）的位置。
+    这是 calibrate Phase 5 写入 Memo 全文（含真实视频名 + 实绩 + 派生证据）的位置。
 
     为什么单独一个文件：blind sub-agent 的白名单是 rubric_notes.md，
     历史上 bump Memo 写进 rubric_notes.md 会让 blind sub-agent 通过白名单
     拿到本该看不到的实绩数据——本文件是隔离修复，sub-agent 硬禁读本文件。
     
-    现在是空的，等第一次 cheat-bump 升级后 append 第一段 Memo。"
+    现在是空的，等第一次 calibrate 升级后 append 第一段 Memo。"
    ```
-   - 复制 `cheat-on-content/templates/rubric-memo.template.md` → `<user-repo>/rubric-memo.md`
+   - 复制 `content-engine/templates/rubric-memo.template.md` → `<user-repo>/rubric-memo.md`
 
 3. **`script_patterns.md`**
    ```
@@ -356,16 +356,16 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
     rubric_notes.md 教 Claude 怎么打分；
     script_patterns.md 教 Claude 怎么写。"
    ```
-   - 复制 `cheat-on-content/templates/script_patterns.template.md`
+   - 复制 `content-engine/templates/script_patterns.template.md`
 
 4. **四个目录**：`scripts/` + `predictions/` + `videos/` + `samples/`（都加 `.gitkeep`）
    ```
    "正在创建四个目录：
     
-    scripts/      — 拍前的草稿（cheat-seed 写或你写）
+    scripts/      — 拍前的草稿（ideate 写或你写）
     predictions/  — immutable 预测日志（hook 保护）
-    videos/       — 拍后的工作目录（cheat-shoot 创建子目录）
-    samples/      — 对标账号视频 / 转录（cheat-learn-from 创建子目录）
+    videos/       — 拍后的工作目录（shoot 创建子目录）
+    samples/      — 对标账号视频 / 转录（learn-from 创建子目录）
     
     前三处用同一组 <date>_<id>_<short> 命名相互关联。
     samples/ 按对标账号名分组：samples/<账号名>/<video-id>/。"
@@ -373,12 +373,12 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
 
 4.5. **`benchmark.md`**（仅 Phase 2.5 选 a/b 时）
    ```
-   "正在复制 benchmark.md 占位模板（实际内容由 cheat-learn-from 填）—— 
+   "正在复制 benchmark.md 占位模板（实际内容由 learn-from 填）——
     这是你的对标账号的中央 reference。
     前期工具的 rubric / pattern / 选题方向感大量从这里推；
     后期 N≥10 后影响淡出，但保留作 sanity check。"
    ```
-   - 复制 `cheat-on-content/templates/benchmark.template.md` → `<user-repo>/benchmark.md`
+   - 复制 `content-engine/templates/benchmark.template.md` → `<user-repo>/benchmark.md`
    - **Phase 2.5 选 c 不创建** → benchmark.md 不存在，state 标 `benchmark_status: none`
 
 4.7. **`audience.md`**
@@ -386,13 +386,13 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
    "正在创建 audience.md — 你账号的受众画像（'谁在看'）。
     
     现在是空骨架。它和 rubric_notes.md 平行——rubric 教 Claude 怎么打分，
-    audience 告诉 Claude 你的观众是谁。跑够几篇复盘后跑 /cheat-persona，
-    它会从评论数据聚类出真实画像，cheat-seed 选题写稿时就有了一面镜子。
+    audience 告诉 Claude 你的观众是谁。跑够几篇复盘后跑 /persona，
+    它会从评论数据聚类出真实画像，ideate 选题写稿时就有了一面镜子。
     
     注意：audience.md 由评论派生 → 含实绩信号 → blind 打分 sub-agent 硬禁读它。"
    ```
-   - 复制 `cheat-on-content/templates/audience.template.md` → `<user-repo>/audience.md`
-   - 如 Phase 2.5 选了 a/b（有 benchmark）→ Phase 5 清单里提示"可跑 `/cheat-persona — seed-from-benchmark` 先 seed 一份未验证画像"
+   - 复制 `content-engine/templates/audience.template.md` → `<user-repo>/audience.md`
+   - 如 Phase 2.5 选了 a/b（有 benchmark）→ Phase 5 清单里提示"可跑 `/persona — seed-from-benchmark` 先 seed 一份未验证画像"
 
 5. **`WORKFLOW.md`** + **`STATUS.md`**
    - 复制 templates/ 对应文件
@@ -402,10 +402,10 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
    - merge 进 `hooks/prediction-immutability.json` 的 `hooks.PreToolUse`
    - merge 进 `hooks/session-start.json` 的 `hooks.SessionStart`
    - merge 进 `hooks/meta-logging.json` 的 hooks（如同时启用）
-   - 复制 `prediction-immutability.sh` + `session-start.sh` + `log-event.sh` 到 `.cheat-hooks/`，chmod +x
-   - settings.json 里的 command 路径用 `${CLAUDE_PROJECT_DIR}/.cheat-hooks/`
+   - 复制 `prediction-immutability.sh` + `session-start.sh` + `log-event.sh` 到 `.nexttake-hooks/`，chmod +x
+   - settings.json 里的 command 路径用 `${CLAUDE_PROJECT_DIR}/.nexttake-hooks/`
 
-7. **(Pool 选项 c—Notion)** 仅记录到 state file 的 `pool_status: notion`，后续 cheat-trends 调用时再处理
+7. **(Pool 选项 c—Notion)** 仅记录到 state file 的 `pool_status: notion`，后续 trends 调用时再处理
 
 ### Phase 3.5: import 流程（仅 Q2=b 且用户同意抓取）
 
@@ -428,7 +428,7 @@ c) 不找 → state 标 `benchmark_status: none`，用通用 v0 起步
 
 import 完成后：
 - 派生 `baseline_plays` = 抓回视频的播放中位数 → 写入 state file
-- 派生 confidence 等级 → 后续 cheat-predict 写预测时直接用
+- 派生 confidence 等级 → 后续 predict 写预测时直接用
 - 输出汇总："已 import N 条历史。最近一条 X w 播放，中位数 Y w，已建 N 个 video folder + reconstructed predictions"
 
 ### Phase 4: 测试 hook 是否生效（仅当 Q5=是）
@@ -438,24 +438,24 @@ import 完成后：
 2. 尝试 Edit 这个文件的 `## 预测` 段
 3. 钩子应 exit 1 阻塞 → 报告"✅ immutability 钩子生效"
 4. 删除测试文件
-5. SessionStart hook 验证：直接调一次 `bash .cheat-hooks/session-start.sh` → 应输出报告（即使是空的也行）
+5. SessionStart hook 验证：直接调一次 `bash .nexttake-hooks/session-start.sh` → 应输出报告（即使是空的也行）
 
 如果钩子未生效 → **不要假装成功**，明确告诉用户："钩子安装失败，可能是 .claude/settings.json 配置没生效。建议手动检查或重启 Claude Code。"
 
-### Phase 4.5: 如 Phase 2.5 选 a → dispatch 到 /cheat-learn-from
+### Phase 4.5: 如 Phase 2.5 选 a → dispatch 到 /learn-from
 
-如果用户在 Phase 2.5 选了 a（现在导对标账号）→ **自动触发 /cheat-learn-from**：
+如果用户在 Phase 2.5 选了 a（现在导对标账号）→ **自动触发 /learn-from**：
 
 ```
 ✅ 脚手架 + hooks 装完。
 
-下面立刻进入 /cheat-learn-from 帮你导入对标账号——
+下面立刻进入 /learn-from 帮你导入对标账号——
 你 init 时选了"现在找"，不让你又开一个会话才跑。
 
-[invoke /cheat-learn-from]
+[invoke /learn-from]
 ```
 
-cheat-learn-from 完成后回到 init 的 Phase 5。
+learn-from 完成后回到 init 的 Phase 5。
 
 如 Phase 2.5 选 b/c → 跳过 Phase 4.5，直接 Phase 5。
 
@@ -474,7 +474,7 @@ cheat-learn-from 完成后回到 init 的 Phase 5。
 📈 任何时候    → "状态"（看完整看板）
 
 <如果 Q4=没有候选选题:>
-🌱 现在跑 /cheat-seed 找选题？
+🌱 现在跑 /ideate 找选题？
    - 没发过历史的：纯 brainstorm（兴趣 × 热点）
    - 发过历史的（已 import）：brainstorm 会基于你过去做过什么给推荐
    回 "yes, seed" 立刻跑，回 "no" 你自己想。
@@ -497,15 +497,15 @@ cheat-learn-from 完成后回到 init 的 Phase 5。
 ## Refusals
 
 - 「跳过 Q1-Q5，直接给我创建所有文件」 → 拒绝。问题答案直接影响默认配置（content_form、cadence、hooks）
-- 「我已经在别处初始化过了，把那个项目的配置同步过来」 → 慎重。提示用户手动 cp 现有 `.cheat-state.json` 和 `rubric_notes.md`，不自动跨项目同步
-- 「不装 hook 但保留 immutability 承诺」 → 允许，state 标 `hooks_installed: false`，cheat-status 持续提示"你的 immutability 是君子协定"
+- 「我已经在别处初始化过了，把那个项目的配置同步过来」 → 慎重。提示用户手动 cp 现有 `.nexttake-state.json` 和 `rubric_notes.md`，不自动跨项目同步
+- 「不装 hook 但保留 immutability 承诺」 → 允许，state 标 `hooks_installed: false`，status 持续提示"你的 immutability 是君子协定"
 
 ## Integration
 
 - 写完后，主 WORKFLOW.md 的路由就解锁了所有其他子 skill
-- `cheat-status` 读 `.cheat-state.json` 的 `calibration_samples` 字段决定显示哪个 confidence 等级
+- `status` 读 `.nexttake-state.json` 的 `calibration_samples` 字段决定显示哪个 confidence 等级
 - 如 Q2=b 走了 import → 历史 reconstructed predictions 进 `predictions/` 和 `videos/<...>/`，但**不**计入 calibration_samples（不是真校准样本）
-- `/cheat-seed` 读 `predictions/` 的所有历史 reconstructed prediction → brainstorm 时知道"用户过去做过什么"
+- `/ideate` 读 `predictions/` 的所有历史 reconstructed prediction → brainstorm 时知道"用户过去做过什么"
 
 ## State 字段写入清单
 
@@ -520,7 +520,7 @@ cheat-learn-from 完成后回到 init 的 Phase 5。
 | `rubric_form_mismatch` | Phase 3 | Q1≠a → true |
 | `benchmark_status` | Phase 3 / 2.5 | Q2.5 答案派生 |
 | `benchmark_name` | Phase 3 / 2.5 | Q2.5 用户提供 |
-| `benchmark_sample_count` | Phase 3 / 2.5 | cheat-learn-from import 后回填 |
+| `benchmark_sample_count` | Phase 3 / 2.5 | learn-from import 后回填 |
 | `baseline_plays` | Phase 3.5（如 import 成功） | import 数据中位数；否则 null |
 | `calibration_samples` | Phase 3 / Phase 3.5 | Q2=a→0；Q2=b→Q2.3 估值或 import 数 |
 | `data_collection` | Phase 3 | Q3 → 查映射表换 enum 值 |

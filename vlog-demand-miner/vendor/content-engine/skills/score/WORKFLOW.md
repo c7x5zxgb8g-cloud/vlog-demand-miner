@@ -1,11 +1,11 @@
 ---
-name: cheat-score
-description: 给单篇稿子打 rubric 分。**只在控制台输出，不写文件，不预测**。触发词："打分这篇 [path]"/"score this [path]"/"给这稿子打分"/"先打分看看"。是 cheat-predict 之前的轻量探索动作。
+name: score
+description: 给单篇稿子打 rubric 分。**只在控制台输出，不写文件，不预测**。触发词："打分这篇 [path]"/"score this [path]"/"给这稿子打分"/"先打分看看"。是 predict 之前的轻量探索动作。
 argument-hint: <draft-path>
 allowed-tools: Read, Glob, Grep
 ---
 
-# /cheat-score — 单稿打分
+# /score — 单稿打分
 
 打分但**不预测**。用户用它快速看稿子的 composite，决定是否值得进入正式预测流程。
 
@@ -28,7 +28,7 @@ allowed-tools: Read, Glob, Grep
 - **RUBRIC_PATH = rubric_notes.md** — 当前 rubric 来源
 - **OUTPUT_DETAIL = full** — full: 含每维度理由；compact: 仅分数表
 
-> 💡 调用时覆盖：`/cheat-score draft.md — OUTPUT_DETAIL: compact`
+> 💡 调用时覆盖：`/score draft.md — OUTPUT_DETAIL: compact`
 
 ## Inputs
 
@@ -36,13 +36,13 @@ allowed-tools: Read, Glob, Grep
 |---|---|
 | `<draft-path>` | 用户作为参数传入；如缺失则在对话里询问 |
 | `rubric_notes.md` | 用户项目根 |
-| `.cheat-state.json` | 用户项目根（用于读当前 `rubric_version` 与 mode） |
+| `.nexttake-state.json` | 用户项目根（用于读当前 `rubric_version` 与 mode） |
 
 ## Workflow
 
 ### Step 1：前置检查
 
-1. 读 `.cheat-state.json` → 不存在则提示用户先跑 `/cheat-init`，停止
+1. 读 `.nexttake-state.json` → 不存在则提示用户先跑 `/initialize`，停止
 2. 读 `<draft-path>` → 不存在或无内容 → 报错并停止
 3. 读 `rubric_notes.md` 找到当前生效的公式段（一般在"当前评分维度"或"综合分公式"位置）
 
@@ -60,23 +60,23 @@ allowed-tools: Read, Glob, Grep
 
 主对话已经被用户对话 / 已发数据 / 历史 retro 段污染——inline 打分等于带着后视镜判分。
 
-改成**通过 Task tool 调 `/cheat-score-blind` sub-agent**，主 Claude 只做调度 + review。详见 [skills/cheat-score-blind/WORKFLOW.md](../cheat-score-blind/WORKFLOW.md)。
+改成**通过 Task tool 调 `/score-blind` sub-agent**，主 Claude 只做调度 + review。详见 [skills/score-blind/WORKFLOW.md](../score-blind/WORKFLOW.md)。
 
 **Task prompt 模板**（**只能含**下面这些）：
 
 ```
-Spawn cheat-score-blind sub-agent.
+Spawn score-blind sub-agent.
 
 Input:
   script_path: <用户给的 draft path>
   rubric_notes_path: rubric_notes.md
 
-Task: 按 rubric_notes 当前公式给上面 script 打分。返回严格 JSON（见 cheat-score-blind WORKFLOW.md Phase 2 schema）。
+Task: 按 rubric_notes 当前公式给上面 script 打分。返回严格 JSON（见 score-blind WORKFLOW.md Phase 2 schema）。
 不要读 state file / predictions/ / videos/ 任何其他文件。
 不要询问用户 —— 你没有用户。
 ```
 
-**禁止**塞进 Task prompt 的东西（[cheat-score-blind/WORKFLOW.md](../cheat-score-blind/WORKFLOW.md) 的"主 Claude 调用契约"段）：
+**禁止**塞进 Task prompt 的东西（[score-blind/WORKFLOW.md](../score-blind/WORKFLOW.md) 的"主 Claude 调用契约"段）：
 - 用户对话引用 / 摘录
 - 含播放数 / 万 / w / k 等字眼
 - "前一次预测是 X" / "实际播放是 Y" 等 hint
@@ -132,28 +132,28 @@ OUTPUT_DETAIL=compact 时仅输出分数表 + composite，不附理由列。
 ### Step 6：**绝不**做的事
 
 - ❌ 写任何文件（包括 predictions/、rubric_notes.md、candidates.md）
-- ❌ 给 bucket 概率分布（那是 cheat-predict 的活）
+- ❌ 给 bucket 概率分布（那是 predict 的活）
 - ❌ 触发"已发布"或"复盘"逻辑
 - ❌ 提议 rubric 升级（即使打分时发现明显异常也只在控制台提示，不动 rubric）
 
 ## Key Rules
 
-1. **打分走 sub-agent**。主 Claude 不再 inline 打分。看 [cheat-score-blind/WORKFLOW.md](../cheat-score-blind/WORKFLOW.md) 的隔离协议
+1. **打分走 sub-agent**。主 Claude 不再 inline 打分。看 [score-blind/WORKFLOW.md](../score-blind/WORKFLOW.md) 的隔离协议
 2. **整数分**。不允许 4.5、3.7
 3. **盲打优先**。sub-agent 只看 script + rubric，天然盲——这是它存在的全部理由
 4. **理由是诊断工具**。每个维度的 1-30 字理由不是装饰——复盘时用来找出哪个维度判断错了
 5. **不写文件**。这是 score 与 predict 的核心区别。score 是探索，predict 是承诺
-6. **不算 candidate composite**。candidates.md 里的 composite 字段在 cheat-trends/cheat-recommend 里写——score 只服务"已写好的具体稿子"
+6. **不算 candidate composite**。candidates.md 里的 composite 字段在 trends/recommend 里写——score 只服务"已写好的具体稿子"
 
 ## Refusals
 
-- 「打分顺便预测一下」 → 拒绝。请改用 `/cheat-predict`。原因：predict 必须走 blind check + 写 immutable 日志，score 跳过这些
+- 「打分顺便预测一下」 → 拒绝。请改用 `/predict`。原因：predict 必须走 blind check + 写 immutable 日志，score 跳过这些
 - 「打完分把分数写进 rubric_notes.md 的观察段」 → 拒绝。observation lifecycle 规定观察必须有"实绩 vs 预测"对比，光有打分不构成观察
 - 「能不能直接告诉我会不会爆」 → 拒绝。给具体 composite + bucket 的判定要求走 predict 流程；score 只输出当前 rubric 下的机械计算
-- 「跳过 blind sub-agent 让主 Claude 直接打」 → cheat-score **不接受**这种 escape hatch（与 cheat-predict 不同；cheat-predict 有 `--skip-blind`）。score 是轻量探索，没理由放弃隔离。如真的 Task tool 不可用 → 提示用户配置后再试
+- 「跳过 blind sub-agent 让主 Claude 直接打」 → score **不接受**这种 escape hatch（与 predict 不同；predict 有 `--skip-blind`）。score 是轻量探索，没理由放弃隔离。如真的 Task tool 不可用 → 提示用户配置后再试
 
 ## Integration
 
-- 是 `cheat-predict` 的前置探索：用户可以反复 score 不同稿子版本，确定一份再 predict
-- score 不更新 `.cheat-state.json`——这是无副作用操作
+- 是 `predict` 的前置探索：用户可以反复 score 不同稿子版本，确定一份再 predict
+- score 不更新 `.nexttake-state.json`——这是无副作用操作
 - 如果用户连续 score 同一稿子 ≥3 次 → 控制台温和提示"反复打分会引入决策疲劳，差不多可以决定了"

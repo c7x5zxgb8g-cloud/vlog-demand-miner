@@ -2,7 +2,7 @@
 """
 diff_pct.py — char-level diff_pct on normalized text.
 
-Replaces the legacy line-level diff in cheat-shoot Phase 3b, which
+Replaces the legacy line-level diff in shoot Phase 3b, which
 inflated diff_pct for spoken-style transcripts (long markdown lines vs
 short transcribed lines) and falsely triggered v2 re-predictions.
 

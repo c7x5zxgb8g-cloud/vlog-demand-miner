@@ -1,8 +1,8 @@
 <h1 align="center">
-  <img src="docs/logo.svg" alt="Cheat on Content" width="720">
+  <img src="docs/logo.svg" alt="NextTake Content Engine" width="720">
 </h1>
 
-<h2 align="center">Cheat on Content</h2>
+<h2 align="center">NextTake Content Engine</h2>
 
 <p align="center">
   <strong>English</strong>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://watcha.cn/products/cheat-on-content">
+  <a href="https://watcha.cn/products/NextTake Content Engine">
     <img src="docs/guancha-no1.svg" alt="Watcha Hot List · 观猹热榜 · #1" width="328">
   </a>
 </p>
@@ -43,7 +43,7 @@ Most creators live in the same gambling loop:
 
 A creator who's shipped 200 pieces is barely 10% sharper than someone who's shipped 1 — because they never **kept books** after each round.
 
-**Cheat on Content** makes every judgment get logged, retrospected, absorbed into the next:
+**NextTake Content Engine** makes every judgment get logged, retrospected, absorbed into the next:
 
 📊 Score → 🎯 Blind-predict → 🚀 Publish → 📈 T+3d retro → 🧬 Evolve your rubric
 
@@ -113,12 +113,12 @@ General LLMs help everyone. This helps **your** account.
 ## 📦 Install
 
 ```bash
-git clone https://github.com/XBuilderLAB/cheat-on-content.git
-cd cheat-on-content
+git clone UPSTREAM.md
+cd NextTake Content Engine
 bash install.sh
 ```
 
-> ⚠️ **Upgrading from v0.x?** Run `/cheat-migrate` in your content project after `git pull`. The 1.3 → 1.4 migration is **BREAKING for blind-channel integrity** — it splits `rubric_notes.md` so the blind sub-agent can't leak actuals. Without migrate, blind scoring will keep flagging `non_blind_warning`. See [CHANGELOG](CHANGELOG.md) and [migrations/1.3-to-1.4.md](migrations/1.3-to-1.4.md).
+> ⚠️ **Upgrading from v0.x?** Run `/migrate` in your content project after `git pull`. The 1.3 → 1.4 migration is **BREAKING for blind-channel integrity** — it splits `rubric_notes.md` so the blind sub-agent can't leak actuals. Without migrate, blind scoring will keep flagging `non_blind_warning`. See [CHANGELOG](CHANGELOG.md) and [migrations/1.3-to-1.4.md](migrations/1.3-to-1.4.md).
 
 14 sub-skills are symlinked into your agent's skill directory. One install, every content project gets it.
 
@@ -135,10 +135,10 @@ bash install.sh
 In your content project directory, open a skill-compatible agent and say:
 
 ```
-初始化 cheat-on-content
+初始化 NextTake Content Engine
 ```
 
-(or `init cheat-on-content`)
+(or `init NextTake Content Engine`)
 
 Five yes/no questions complete onboarding. **Strongly recommend importing a benchmark account** — 5–10 samples and the tool gets an anchor immediately. Without one, your first 5 predictions land at ±50% precision.
 
@@ -163,7 +163,7 @@ Full workflow + internal workflow details: see [ENGINE.md](ENGINE.md).
 
 ## 📈 Star History
 
-<a href="https://star-history.com/#XBuilderLAB/cheat-on-content&Date">
+<a href="https://star-history.com/#c7x5zxgb8g-cloud/vlog-demand-miner&Date">
   <img src="docs/star-history.svg" alt="Star History Chart" width="720">
 </a>
 

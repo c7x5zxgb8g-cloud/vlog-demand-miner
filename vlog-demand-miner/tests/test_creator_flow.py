@@ -32,7 +32,7 @@ class CreatorFlowTests(unittest.TestCase):
     def test_writes_native_candidate_source_and_link_idempotently(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            (project / ".cheat-state.json").write_text("{}\n", encoding="utf-8")
+            (project / ".nexttake-state.json").write_text("{}\n", encoding="utf-8")
             first = creator_flow.write_opportunity(project, self.opportunity(), "2026-07-17")
             second = creator_flow.write_opportunity(project, self.opportunity(), "2026-07-17")
             candidates = (project / "candidates.md").read_text(encoding="utf-8")
@@ -46,7 +46,7 @@ class CreatorFlowTests(unittest.TestCase):
     def test_attach_registers_native_files_and_copies_only_raw_performance(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            (project / ".cheat-state.json").write_text("{}\n", encoding="utf-8")
+            (project / ".nexttake-state.json").write_text("{}\n", encoding="utf-8")
             creator_flow.write_opportunity(project, self.opportunity(), "2026-07-17")
             paths = {}
             for field, relative in {"script_path": "scripts/a.md", "next_script_path": "scripts/next.md", "prediction_path": "predictions/a.md", "report_path": "videos/a/report.md", "audience_path": "audience.md", "recommendation_path": ".nexttake/recommendation.md"}.items():
@@ -62,7 +62,7 @@ class CreatorFlowTests(unittest.TestCase):
     def test_reprepare_does_not_erase_attached_lifecycle_paths(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            (project / ".cheat-state.json").write_text("{}\n", encoding="utf-8")
+            (project / ".nexttake-state.json").write_text("{}\n", encoding="utf-8")
             first = creator_flow.write_opportunity(project, self.opportunity(), "2026-07-17")
             link_path = Path(first["link_file"])
             link = json.loads(link_path.read_text(encoding="utf-8")); link["script_path"] = "scripts/existing.md"; link_path.write_text(json.dumps(link), encoding="utf-8")

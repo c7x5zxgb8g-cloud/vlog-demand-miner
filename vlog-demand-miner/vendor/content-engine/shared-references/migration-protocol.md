@@ -1,6 +1,6 @@
 # Migration Protocol（schema 演进哲学）
 
-被 `cheat-migrate` skill / `cheat-init` / SessionStart hook / 维护者引用。规定如何安全演进 `.cheat-state.json` schema 而不让老用户被打断。
+被 `migrate` skill / `initialize` / SessionStart hook / 维护者引用。规定如何安全演进 `.nexttake-state.json` schema 而不让老用户被打断。
 
 ---
 
@@ -40,14 +40,14 @@
 
 每次准备 release 时如果改了 state schema：
 
-### 1. 改 cheat-init 写新 state 的硬编码 schema_version
+### 1. 改 initialize 写新 state 的硬编码 schema_version
 
 ```diff
 - "schema_version": "1.1",
 + "schema_version": "1.2",
 ```
 
-位置：`skills/cheat-init/WORKFLOW.md` Phase 3 的 state 写入段。
+位置：`skills/initialize/WORKFLOW.md` Phase 3 的 state 写入段。
 
 ### 2. 改 migrations/registry.md 的 LATEST_SCHEMA 标记位
 
@@ -67,7 +67,7 @@
 4 段必填（参考 `1.0-to-1.1.md` 模板）：
 - WHAT changed
 - WHY
-- HOW (Claude steps for /cheat-migrate)
+- HOW (Claude steps for /migrate)
 - Manual fallback
 
 > 写不出 4 段 = 改动太复杂没想清楚 = 不该 release 这次 schema bump。
@@ -118,7 +118,7 @@ hook 在每次会话开始时检测：
 state_schema=$(jq -r '.schema_version // "unknown"' "$STATE_FILE")
 if [[ "$state_schema" != "$LATEST_SCHEMA" ]]; then
   echo "⚠️ schema 版本不一致：state=$state_schema, skill 期望=$LATEST_SCHEMA"
-  echo "   建议跑 /cheat-migrate 升级（不阻塞继续工作）"
+  echo "   建议跑 /migrate 升级（不阻塞继续工作）"
 fi
 ```
 
@@ -139,11 +139,11 @@ fi
 
 ## 备份保留策略
 
-`/cheat-migrate` 写之前会备份到 `.cheat-state.json.backup-<timestamp>`。
+`/migrate` 写之前会备份到 `.nexttake-state.json.backup-<timestamp>`。
 
 备份保留多久：
-- 用户跑 `/cheat-status` 时，如果有备份 + state 已稳定运行 N 天 → 提示"可以清理 N 个旧备份"
-- `/cheat-init` 重 init 时清理所有旧备份（既然要重 init，老备份意义不大）
-- 用户手动 `rm .cheat-state.json.backup-*` 永远 OK
+- 用户跑 `/status` 时，如果有备份 + state 已稳定运行 N 天 → 提示"可以清理 N 个旧备份"
+- `/initialize` 重 init 时清理所有旧备份（既然要重 init，老备份意义不大）
+- 用户手动 `rm .nexttake-state.json.backup-*` 永远 OK
 
-不入版本控制：`.cheat-state.json.backup-*` 应在 `.gitignore` 里（已含 `.cheat-state.json` 通配规则）。
+不入版本控制：`.nexttake-state.json.backup-*` 应在 `.gitignore` 里（已含 `.nexttake-state.json` 通配规则）。

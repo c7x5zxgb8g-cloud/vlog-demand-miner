@@ -1,11 +1,11 @@
 ---
-name: cheat-recommend
+name: recommend
 description: 从 candidates.md 里按当前 rubric 排序推荐 top N 选题，每条带 composite + 一句 rationale + 锚点对比。**candidates 不存在时给引导而非报错**。触发词："推荐选题"/"next topic"/"下一篇做什么"/"recommend topics"/"挑一个选题"。
 argument-hint: [— top: N] [— filter: tier1|all|safe|risky]
 allowed-tools: Read, Glob, Grep
 ---
 
-# /cheat-recommend — 候选池排序推荐
+# /recommend — 候选池排序推荐
 
 读 candidates.md → 按 composite 排序 → 输出 top N 推荐，每条带评分细节 + 锚点对比 + 推荐理由。
 
@@ -35,7 +35,7 @@ allowed-tools: Read, Glob, Grep
 - **REQUIRE_SCORED = true** — 只推荐已打分的——避免推没读过的素材
 - **DUPLICATE_CATEGORY_LOOKBACK** — 派生自 `state.target_publish_cadence_days`：max(3, cadence_days × 3) 天内已发同类目候选不推（避免审美疲劳）
 
-> 💡 调用时覆盖：`/cheat-recommend — top: 3 — filter: safe`
+> 💡 调用时覆盖：`/recommend — top: 3 — filter: safe`
 
 ## Inputs
 
@@ -43,7 +43,7 @@ allowed-tools: Read, Glob, Grep
 |---|---|
 | `candidates.md` | 用户项目根 |
 | `predictions/*.md` | 用于去重 |
-| `.cheat-state.json` | 当前 rubric_version |
+| `.nexttake-state.json` | 当前 rubric_version |
 
 ## Workflow
 
@@ -57,14 +57,14 @@ allowed-tools: Read, Glob, Grep
 | 文件存在但空（< 1 个 entry） | 同上 |
 | 文件存在且非空 | 进入 Phase 1 |
 
-**无候选池引导**（核心：不让用户第一次遇到 cheat-recommend 时被劝退）：
+**无候选池引导**（核心：不让用户第一次遇到 recommend 时被劝退）：
 
 ```
 你目前没有候选池（candidates.md 不存在或为空）。
 
 绝大部分人没有候选池——这很正常。四个建立方式，挑一个：
 
-1. 🌱 [推荐] 跑 /cheat-seed
+1. 🌱 [推荐] 跑 /ideate
    一次性的种子动作：3 个问题（兴趣 / 调性 / 红线）→ 拉公开热点 + Claude brainstorm
    → 输出 15 候选让你挑 5 → 默认顺带写 5 个 draft。5 分钟搞定。
    
@@ -73,18 +73,18 @@ allowed-tools: Read, Glob, Grep
    
    说："找选题" 或 "seed"
 
-2. 🔥 [日常补充] 用 /cheat-trends 抓 20 条带打分的候选
+2. 🔥 [日常补充] 用 /trends 抓 20 条带打分的候选
    说："抓热点" — 从 weibo-hot / zhihu-hot / b站热门 / HN / 你配的源各拉 N 条
-   适合已经跑过 /cheat-seed、想日常补充候选池的用户
+   适合已经跑过 /ideate、想日常补充候选池的用户
 
 3. ✍️  手动建：把候选标题贴进 candidates.md，每行一条
    我会自动给每条粗打分
 
-4. 📋 从 Notion / RSS 导入：跑 /cheat-init --mode add-pool 配置 adapter
+4. 📋 从 Notion / RSS 导入：跑 /initialize --mode add-pool 配置 adapter
 
 你也可以跳过候选池，直接给我具体稿子说"启动预测"。
 
-> /cheat-seed vs /cheat-trends 的区别：
+> /ideate vs /trends 的区别：
 > - seed 是种子动作（含 brainstorm + 可选 draft），适合"我从零开始没选题"
 > - trends 是日常多 adapter 抓取（不 brainstorm 不写 draft），适合"日常补充候选池"
 ```
@@ -225,11 +225,11 @@ allowed-tools: Read, Glob, Grep
 ## Refusals
 
 - 「直接给我 composite 最高的，不用解释理由」 → 拒绝。展示评分 + 锚点是发现"打错"的唯一机会
-- 「把 candidates.md 里所有 entry 都重新打分一遍」 → 路由到 `/cheat-score` 单条做；批量重打分是 `/cheat-bump` 的一部分，不在 recommend 范围
+- 「把 candidates.md 里所有 entry 都重新打分一遍」 → 路由到 `/score` 单条做；批量重打分是 `/calibrate` 的一部分，不在 recommend 范围
 - 「按预测桶排，不要按 composite」 → 询问理由。bucket 是 composite 的离散化，按 composite 排即按 bucket 排，差异在桶内序——如果用户真想按"押注期望值"排，需要乘以平均播放，那是另一个独立 scoring 维度
 
 ## Integration
 
-- 上游：`/cheat-trends` 把外部热点拉进 candidates.md → recommend 自动看到
-- 下游：用户挑一条后写稿 → `/cheat-predict`（candidate 的粗 composite 不进入 prediction，prediction 重新打）
-- 与 `/cheat-status` 协调：status 显示 "candidates 池有 N 条 tier1 未发"，recommend 提供具体推荐
+- 上游：`/trends` 把外部热点拉进 candidates.md → recommend 自动看到
+- 下游：用户挑一条后写稿 → `/predict`（candidate 的粗 composite 不进入 prediction，prediction 重新打）
+- 与 `/status` 协调：status 显示 "candidates 池有 N 条 tier1 未发"，recommend 提供具体推荐

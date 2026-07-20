@@ -70,9 +70,9 @@ class DouyinBrowserProviderTests(unittest.TestCase):
     def test_upstream_debug_output_is_scoped_to_external_profile(self) -> None:
         provider = browser.BrowserProvider(Path("/tmp/vdm-browser-test"))
         provider.previous_upstream_root = None
-        with patch.dict(browser.os.environ, {"CHEAT_PROJECT_ROOT": str(provider.profile_dir)}, clear=False):
+        with patch.dict(browser.os.environ, {"NEXTTAKE_PROJECT_ROOT": str(provider.profile_dir)}, clear=False):
             provider._restore_upstream_root()
-            self.assertNotIn("CHEAT_PROJECT_ROOT", browser.os.environ)
+            self.assertNotIn("NEXTTAKE_PROJECT_ROOT", browser.os.environ)
 
     def test_auto_mode_switches_once_after_sidecar_failure(self) -> None:
         args = SimpleNamespace(

@@ -2,7 +2,7 @@
 
 **这是给完全没数据的新作者用的占位 rubric。**它会打错。**前 5 篇预测精度大概 ±50%——这是 cold-start 的数学事实，不是 rubric 失败**。
 
-跑完 5 篇（每篇都走完 `/cheat-predict` → 发布 → `/cheat-retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/cheat-bump` 升级到 v1（或直接采用同形式的稳定 rubric 作为起点重新校准权重）。
+跑完 5 篇（每篇都走完 `/predict` → 发布 → `/retro` 闭环）之后，你会有第一份个人校准数据，可以提议第一次 `/calibrate` 升级到 v1（或直接采用同形式的稳定 rubric 作为起点重新校准权重）。
 
 ---
 
@@ -101,7 +101,7 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 | 小爆 | 3 - 10 × baseline | 显著破圈 |
 | 大爆 | > 10 × baseline | 量级跃迁 |
 
-第 5 篇后跑 `/cheat-bump --bucket-only` 重新校准边界。
+第 5 篇后跑 `/calibrate --bucket-only` 重新校准边界。
 
 ---
 
@@ -127,7 +127,7 @@ composite = (ER + HP + QL + NA + AB + SR + SAT) / 7 × 2.0
 
 - cold-start 期 composite 的置信度低——**不要基于 v0 分数决定要不要发某篇文章**
 - 前 5 篇**每篇必须走完整闭环**（predict → 发布 → retro），跳过任何一篇复盘 = 整个校准失败
-- 第 5 篇后**必须**跑 `/cheat-bump` 升级
+- 第 5 篇后**必须**跑 `/calibrate` 升级
 
 ---
 

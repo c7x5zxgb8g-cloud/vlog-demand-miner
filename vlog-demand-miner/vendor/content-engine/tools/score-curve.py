@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-score-curve.py — predict accuracy convergence chart for cheat-on-content.
+score-curve.py — predict accuracy convergence chart for NextTake Content Engine.
 
 Reads predictions/*.md (in the user's project), pairs each prediction's
 center-of-bucket estimate against actual plays from the retrospective section,
@@ -173,7 +173,7 @@ def render_chart(samples: list[Sample], out_path: Path, window: int) -> bool:
 
     ax.set_xlabel("第 N 篇校准样本")
     ax.set_ylabel("|预测中枢偏差%|")
-    ax.set_title("Cheat-on-Content — 预测精度收敛曲线")
+    ax.set_title("NextTake Content Engine — 预测精度收敛曲线")
     ax.set_xticks(indices)
     ax.set_xticklabels([s.date.strftime("%m-%d") for s in samples_with_retro], rotation=45, ha="right")
     ax.legend(loc="upper right")

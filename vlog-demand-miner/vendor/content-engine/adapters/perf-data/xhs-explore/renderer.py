@@ -1,4 +1,4 @@
-"""把抓到的小红书数据渲染成 report.md（cheat-retro 读这个文件）。"""
+"""把抓到的小红书数据渲染成 report.md（retro 读这个文件）。"""
 from __future__ import annotations
 
 import datetime as dt

@@ -14,6 +14,8 @@ NextTake applies interface-only packaging changes while preserving the workflow 
 
 - the upstream root `SKILL.md` is packaged as `ENGINE.md`;
 - nested `skills/*/SKILL.md` files are packaged as `skills/*/WORKFLOW.md` so Codex discovers only NextTake as a public Skill;
+- workflow directories use neutral action names such as `initialize`, `ideate`, `predict` and `retro`;
+- creator runtime files use the `.nexttake-*` namespace and environment variables use the `NEXTTAKE_*` namespace;
 - creator-facing templates translate upstream command names into NextTake natural-language actions;
 - the vendor directory is named `content-engine` so runtime paths and diagnostics do not leak the implementation brand.
 
@@ -33,6 +35,6 @@ The vendored tree excludes upstream Git metadata and generated or private runtim
 
 ## Local Integration
 
-NextTake keeps this source tree self-contained and points the VDM Douyin Browser Provider at its `douyin-session` adapter by default. Public overrides are `NEXTTAKE_CONTENT_ENGINE_ROOT` and `NEXTTAKE_DOUYIN_ADAPTER_DIR`; legacy environment names remain read-only compatibility aliases and are not documented in the public interface.
+NextTake keeps this source tree self-contained and points the VDM Douyin Browser Provider at its `douyin-session` adapter by default. Public overrides are `NEXTTAKE_CONTENT_ENGINE_ROOT` and `NEXTTAKE_DOUYIN_ADAPTER_DIR`; upstream-branded compatibility aliases are intentionally not exposed.
 
 NextTake-owned code lives outside this directory. Any future compatibility patch inside the vendored tree must be documented here before the manifest is regenerated.

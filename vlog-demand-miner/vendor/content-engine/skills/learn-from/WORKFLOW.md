@@ -1,20 +1,20 @@
 ---
-name: cheat-learn-from
+name: learn-from
 description: 从对标账号导入 script + 数据 → 拆 pattern + 派生 base rubric 信号 → 写到 benchmark.md / script_patterns.md / rubric_notes.md。**这是工具最早期信号的来源**——cold-start 用户没自己历史时全靠对标，发过历史的用户也建议至少 1 个对标做 sanity check。触发词："学这个账号"/"拆这几个对标视频"/"learn from"/"导入对标账号"/"找对标"。
 argument-hint: <账号名> [— way: a (default) | b] [— append | --replace]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 ---
 
-# /cheat-learn-from — 对标账号导入
+# /learn-from — 对标账号导入
 
 工具早期最重要的信号源是**对标账号**——你 init 完没数据，rubric 等权 v0 等于占星。但如果你能找一个你想做成那样的账号，导入 5-10 条它的高/中/低样本，工具就有了 anchor。
 
-后期当你自己 calibration_samples ≥ 10 时，benchmark 影响自然减弱——你的真实数据成为主要信号源。但 benchmark.md **不删**，仍是 cheat-seed brainstorm 的 reference frame。
+后期当你自己 calibration_samples ≥ 10 时，benchmark 影响自然减弱——你的真实数据成为主要信号源。但 benchmark.md **不删**，仍是 ideate brainstorm 的 reference frame。
 
 ## Overview
 
 ```
-[用户：学这个账号 / 启动 cheat-learn-from]
+[用户：学这个账号 / 启动 learn-from]
   ↓
 [Phase 0: 检查 benchmark 状态]
   ↓
@@ -47,7 +47,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 | 必填 | 来源 |
 |---|---|
 | `<账号名>` | 用户参数；缺失则询问 |
-| `.cheat-state.json` | 状态文件 |
+| `.nexttake-state.json` | 状态文件 |
 | Way a: 用户粘的 script 文本 + 数据 | 对话 |
 | Way b: `samples/<账号名>/*.mp4` 等视频文件 | 用户提前下载好放进去 |
 
@@ -55,7 +55,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 
 ### Phase 0: 检查 benchmark 状态
 
-读 `.cheat-state.json` 的 `benchmark_status`：
+读 `.nexttake-state.json` 的 `benchmark_status`：
 
 | 状态 | 处理 |
 |---|---|
@@ -360,17 +360,17 @@ samples/<账号名>/<video-id>/
 - 「跳过印象判断，直接拆」 → 拒绝。印象是关键 input
 - 「我只能给 1 条样本」 → 拒绝。最少 3 条
 - 「直接给我数值权重」 → 拒绝。Phase 4 只给定性信号
-- 「能不能不写 transcript 文件，只在内存里拆」 → 不行。transcript 持久化是后续 cheat-retro Phase 4b diff 的依据
+- 「能不能不写 transcript 文件，只在内存里拆」 → 不行。transcript 持久化是后续 retro Phase 4b diff 的依据
 - 「帮我下载对标视频」 → 拒绝。引导用户用 yt-dlp / BBDown 等工具自己下
 
 ## Integration
 
-- 上游：`/cheat-init` Phase 2.5 在 cold-start 用户时**强烈建议**跑 `/cheat-learn-from`；calibration 用户**可选**
-- 上游：`/cheat-status` 在 `benchmark_status=pending` + 距 init >24h 时持续提醒
-- 下游：`/cheat-seed` brainstorm 时读 benchmark.md → 知道用户对标方向
-- 下游：`script_patterns.md` 加新段，cheat-seed 写 draft 时按 pattern 选结构
-- 下游：`rubric_notes.md` 加 benchmark-derived signals 段，cheat-bump 时作为参考之一
-- N≥10 提示：`cheat-status` 在用户 calibration_samples ≥10 时提示"你已有足够自己数据，benchmark 影响淡出（保留作 sanity check）"
+- 上游：`/initialize` Phase 2.5 在 cold-start 用户时**强烈建议**跑 `/learn-from`；calibration 用户**可选**
+- 上游：`/status` 在 `benchmark_status=pending` + 距 init >24h 时持续提醒
+- 下游：`/ideate` brainstorm 时读 benchmark.md → 知道用户对标方向
+- 下游：`script_patterns.md` 加新段，ideate 写 draft 时按 pattern 选结构
+- 下游：`rubric_notes.md` 加 benchmark-derived signals 段，calibrate 时作为参考之一
+- N≥10 提示：`status` 在用户 calibration_samples ≥10 时提示"你已有足够自己数据，benchmark 影响淡出（保留作 sanity check）"
 
 ## benchmark 何时淡出
 
@@ -380,20 +380,20 @@ samples/<账号名>/<video-id>/
 - **可以更早**：N=5 但用户的 (打分, 实绩) 配对里出现 ≥3 条与 benchmark pattern 不一致的——说明你账号已经走出对标的路径
 - **可以更晚**：N=15 但用户的样本都很相似（都做同一类内容），benchmark 仍有信号价值
 
-判断条件 + 默认值都在 cheat-status 触发器 #19 / cheat-seed Phase 0 里实现。
+判断条件 + 默认值都在 status 触发器 #19 / ideate Phase 0 里实现。
 
 **淡出后**：
-- cheat-seed brainstorm 仍读 benchmark.md，但**优先级低于用户自己的 predictions/**
+- ideate brainstorm 仍读 benchmark.md，但**优先级低于用户自己的 predictions/**
 - rubric_notes 的 benchmark signals 段标 `**Status: superseded by user data**`，不删但不再主导
 - benchmark.md **不删**——保留作 sanity check（看你账号是否真的偏离对标方向太远）
 
-**任何时候用户主动**：跑 `/cheat-learn-from --replace none` 完全解除 benchmark 影响
+**任何时候用户主动**：跑 `/learn-from --replace none` 完全解除 benchmark 影响
 
 ## 与其他 skill 的区别
 
 | Skill | 用途 |
 |---|---|
-| `/cheat-learn-from` | **从对标账号**导入 pattern / rubric 信号（一次性 / 偶尔追加） |
-| `/cheat-seed` | brainstorm 选题 + 写 draft（读 benchmark.md 作参考） |
-| `/cheat-trends` | 抓今天的热点（与 benchmark 无关） |
-| `/cheat-bump` | 升级 rubric（用户自己 N≥5 后用真实数据，不直接用 benchmark signals） |
+| `/learn-from` | **从对标账号**导入 pattern / rubric 信号（一次性 / 偶尔追加） |
+| `/ideate` | brainstorm 选题 + 写 draft（读 benchmark.md 作参考） |
+| `/trends` | 抓今天的热点（与 benchmark 无关） |
+| `/calibrate` | 升级 rubric（用户自己 N≥5 后用真实数据，不直接用 benchmark signals） |

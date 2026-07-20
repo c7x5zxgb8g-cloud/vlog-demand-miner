@@ -1,10 +1,10 @@
 ---
-name: cheat-status
-description: cheat-on-content 的状态看板。显示当前模式 / rubric 版本 / 校准进度 / 待复盘 / pool 状态 / 是否该升级 SQLite / 是否该 bump rubric。**任何时候都可调，无副作用**。触发词："状态"/"看板"/"status"/"我现在该做什么"/"进度怎么样"。
+name: status
+description: NextTake Content Engine 的状态看板。显示当前模式 / rubric 版本 / 校准进度 / 待复盘 / pool 状态 / 是否该升级 SQLite / 是否该 bump rubric。**任何时候都可调，无副作用**。触发词："状态"/"看板"/"status"/"我现在该做什么"/"进度怎么样"。
 allowed-tools: Bash(*), Read, Glob, Grep
 ---
 
-# /cheat-status — 状态看板
+# /status — 状态看板
 
 读 state file + 扫描用户项目 → 汇总当前进度 → 输出"今天该做什么"清单。
 
@@ -13,7 +13,7 @@ allowed-tools: Bash(*), Read, Glob, Grep
 ```
 [用户：状态]
   ↓
-[Phase 1: 读 .cheat-state.json + 扫文件系统]
+[Phase 1: 读 .nexttake-state.json + 扫文件系统]
   ↓
 [Phase 2: 计算派生指标]
   ↓
@@ -32,20 +32,20 @@ allowed-tools: Bash(*), Read, Glob, Grep
 
 | 来源 | 用途 |
 |---|---|
-| `.cheat-state.json` | 主要状态 |
+| `.nexttake-state.json` | 主要状态 |
 | `predictions/*.md` | 校准样本数 / pending retros |
 | `candidates.md` | 候选池规模 |
 | `rubric_notes.md` | 行数 / 当前版本 |
-| `.cheat-cache/usage.jsonl`（如有） | meta-logging 数据，用于"距上次 bump 多少次预测" |
+| `.nexttake-cache/usage.jsonl`（如有） | meta-logging 数据，用于"距上次 bump 多少次预测" |
 
 ## Workflow
 
 ### Phase 1: 读状态
 
 ```python
-state = read_json('.cheat-state.json')
+state = read_json('.nexttake-state.json')
 if not state:
-    return "你还没初始化。请先跑 /cheat-init。"
+    return "你还没初始化。请先跑 /initialize。"
 
 predictions = glob('predictions/*.md')
 candidates_count = parse_candidates_md_entries()
@@ -76,33 +76,33 @@ rubric_lines = wc -l rubric_notes.md
 3. **state.shoots 中最早一项 shot_at > 14 天** → "你有视频拍了 N 天还没发——议题时效流失风险，建议尽快发或弃稿"
 4. **in_progress 陈旧** (>= STALE_PREDICTION_DAYS) → 高优先级提示"清理或 publish"
 5. **待复盘 ≥ 1** → 高优先级"今天该复盘 X 篇"
-6. **`pool_status=none` + `calibration_samples=0` + 距 init >24h** → "🌱 你 init 完已经 N 天但还没拍——是因为没选题吗？跑 /cheat-seed 5 分钟拿 5 个候选 + 5 个 draft" 高优先级
-7. **Claude 判断系统性偏差信号**（**不是死磕 ≥3 同向**） → 提示"建议跑 /cheat-bump"
+6. **`pool_status=none` + `calibration_samples=0` + 距 init >24h** → "🌱 你 init 完已经 N 天但还没拍——是因为没选题吗？跑 /ideate 5 分钟拿 5 个候选 + 5 个 draft" 高优先级
+7. **Claude 判断系统性偏差信号**（**不是死磕 ≥3 同向**） → 提示"建议跑 /calibrate"
    - **默认参考**：连续 ≥3 次同向偏差
    - **但 Claude 可以更早**：1 次极端偏差（≥10x）或 2 次同向 + 评论区强反向证据
    - **也可以更晚**：3 次同向但每次幅度都 <25%（可能只是噪声）
    - 提示时显式标注："本次是 [default-aligned] / [judgment-driven]"
 8. **calibration_samples 跨入新 confidence 等级**（0→1, 2→3, 5→6, 10→11, 20→21）→ 提示"🎉 confidence 升级：<旧等级> → <新等级>。bucket 中枢精度从 ±X% 提到 ±Y%"。**仅作通知，无任何用户必须确认的操作**——所有 skill 都已经按 calibration_samples 自动调整
-9. **calibration_samples 跨过 5** → "你的 rubric 形态可以第一次正式 bump 了。回顾 rubric_notes.md 看观察记录段是否有 ≥3 样本支持的 pattern → 跑 /cheat-bump"
-10. **calibration_samples 跨过 10** → "可以跑 /cheat-bump --bucket-only --scheme percentile 让 bucket 边界改用 percentile（永远自洽）"
+9. **calibration_samples 跨过 5** → "你的 rubric 形态可以第一次正式 bump 了。回顾 rubric_notes.md 看观察记录段是否有 ≥3 样本支持的 pattern → 跑 /calibrate"
+10. **calibration_samples 跨过 10** → "可以跑 /calibrate --bucket-only --scheme percentile 让 bucket 边界改用 percentile（永远自洽）"
 11. **calibration_samples 跨过 SQLITE_UPGRADE_THRESHOLD** 且 data_layer=markdown → "建议跑 tools/md-to-sqlite.py"（planned — batch 3, not yet available）
 12. **rubric_notes.md 行数 > CLEANUP_LINE_THRESHOLD** → "建议清算观察段（手动或下次 bump 触发）"
 13. **calibration_samples ≥ 5 + pool_status=none** → "可以开始建立选题池了"
-14. **calibration_samples ≥ 15 + pool_status=none** → "强烈建议建池：/cheat-trends 或手动建 candidates.md"
-15. **state.hooks_installed=false** → "你的 immutability 是君子协定，建议跑 /cheat-init 装 hook"
+14. **calibration_samples ≥ 15 + pool_status=none** → "强烈建议建池：/trends 或手动建 candidates.md"
+15. **state.hooks_installed=false** → "你的 immutability 是君子协定，建议跑 /initialize 装 hook"
 16. **state.last_bump_self_audited=true** → "上次 bump 是自审。建议配置 mcp__llm-chat__chat 后下次 bump 走外部审"
 17. **state.rubric_form_mismatch=true** → "你的 content_form 不是 opinion-video，用了内置观点 rubric。前几篇预测会更不准，下次 bump 时建议自行调整权重适配你的形态"
-18. **state.benchmark_status=pending** → "🎯 你 init 时答应等下找对标账号但还没找。跑 /cheat-learn-from 导入 ≥3 条对标视频，工具就有 anchor 了"
+18. **state.benchmark_status=pending** → "🎯 你 init 时答应等下找对标账号但还没找。跑 /learn-from 导入 ≥3 条对标视频，工具就有 anchor 了"
 19. **state.benchmark_status=imported + Claude 判断用户数据信号已超过 benchmark** → "📊 你的真实数据已经成为主信号，benchmark 影响淡出"
    - **默认参考**：calibration_samples ≥ 10
    - **但 Claude 可以更早**：N=5 但用户的 (打分, 实绩) 配对里出现 ≥3 条与 benchmark pattern 不一致的——说明你的账号已经走出对标的路径
    - **也可以更晚**：N=15 但用户的样本都很相似，没足够多样性 → benchmark 仍有信号价值
-   - 提示是**通知不是 gate**——benchmark.md 永远保留作 sanity check，cheat-seed 仍可读
+   - 提示是**通知不是 gate**——benchmark.md 永远保留作 sanity check，ideate 仍可读
 
 ### Phase 4: 输出看板
 
 ```
-🎛️ cheat-on-content 状态（更新于 2026-05-04 15:00）
+🎛️ NextTake Content Engine 状态（更新于 2026-05-04 15:00）
 
 内容形态：opinion-video / 时长 3-5min / cadence: 隔日更
 当前 rubric：v2 (上次 bump: 2026-04-22)
@@ -120,13 +120,13 @@ Baseline: 4.2w 中位数
 🎬 待办（按紧急度）
   🚨 复盘 1 篇（已过 T+3d）
      - predictions/2026-05-01_db063817_你已不在关系里.md（T+3d 到了）
-  ⚠️  同向偏差 3 次（high, high, high）→ 建议 /cheat-bump
+  ⚠️  同向偏差 3 次（high, high, high）→ 建议 /calibrate
   💤 in-progress prediction 已陈旧 35 天
      - predictions/2026-04-01_xxx.md → 是已发了忘登记？还是弃稿？
 
 🔥 候选池
   - candidates.md: 27 条（tier1: 12, tier2: 9, tier3: 6）
-  - 距上次抓热点: 4 天 — 可以再跑 /cheat-trends
+  - 距上次抓热点: 4 天 — 可以再跑 /trends
 
 📈 健康度
   - rubric_notes.md: 412 行（健康，<600 警戒线）
@@ -134,8 +134,8 @@ Baseline: 4.2w 中位数
   - external audit configured: ❌ → 建议配 mcp__llm-chat__chat
 
 下一步建议（按推荐优先级）：
-1. /cheat-retro predictions/2026-05-01_db063817_你已不在关系里.md  ← 最紧急
-2. /cheat-bump  ← 同向偏差 3 次的处理
+1. /retro predictions/2026-05-01_db063817_你已不在关系里.md  ← 最紧急
+2. /calibrate  ← 同向偏差 3 次的处理
 3. 处理陈旧 in-progress（手动或回 "清理 in-progress"）
 
 完整的命令清单见主 WORKFLOW.md。
@@ -148,7 +148,7 @@ Baseline: 4.2w 中位数
 1. **无副作用**。读多写零。任何状态修改是其他 skill 的事
 2. **不假装数据可用**。state file 字段缺失 → 显式标"未知"，不猜
 3. **建议带优先级**。10 个建议同时显示用户会麻木——按紧急度排
-4. **每个建议附命令**。不能只说"该 bump 了"——要给 `/cheat-bump --propose "..."` 的精确入口
+4. **每个建议附命令**。不能只说"该 bump 了"——要给 `/calibrate --propose "..."` 的精确入口
 
 ## Refusals
 
@@ -157,6 +157,6 @@ Baseline: 4.2w 中位数
 
 ## Integration
 
-- 上游：所有其他 skill 完成时更新 .cheat-state.json，status 是这些更新的可视化
+- 上游：所有其他 skill 完成时更新 .nexttake-state.json，status 是这些更新的可视化
 - 下游：每个建议都路由到具体子 skill
 - meta-logging hook（如启用） → 写 usage.jsonl，status 用它算"距上次 X 多少次"

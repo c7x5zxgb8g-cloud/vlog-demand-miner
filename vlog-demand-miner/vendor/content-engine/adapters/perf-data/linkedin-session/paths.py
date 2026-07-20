@@ -10,8 +10,8 @@ def runtime_project_root(
     cwd: Path | None = None,
 ) -> Path:
     active_env = env if env is not None else os.environ
-    if active_env.get("CHEAT_PROJECT_ROOT"):
-        return Path(active_env["CHEAT_PROJECT_ROOT"]).expanduser().resolve()
+    if active_env.get("NEXTTAKE_PROJECT_ROOT"):
+        return Path(active_env["NEXTTAKE_PROJECT_ROOT"]).expanduser().resolve()
     base_cwd = cwd if cwd is not None else Path.cwd()
     return Path(base_cwd).expanduser().resolve()
 
@@ -28,7 +28,7 @@ def debug_dir(
     env: Mapping[str, str] | None = None,
     cwd: Path | None = None,
 ) -> Path:
-    return runtime_project_root(env=env, cwd=cwd) / ".cheat-cache" / "linkedin-session-debug"
+    return runtime_project_root(env=env, cwd=cwd) / ".nexttake-cache" / "linkedin-session-debug"
 
 
 def videos_dir(
@@ -36,6 +36,6 @@ def videos_dir(
     cwd: Path | None = None,
 ) -> Path:
     active_env = env if env is not None else os.environ
-    if active_env.get("CHEAT_VIDEOS_DIR"):
-        return Path(active_env["CHEAT_VIDEOS_DIR"]).expanduser().resolve()
+    if active_env.get("NEXTTAKE_VIDEOS_DIR"):
+        return Path(active_env["NEXTTAKE_VIDEOS_DIR"]).expanduser().resolve()
     return runtime_project_root(env=env, cwd=cwd) / "videos"

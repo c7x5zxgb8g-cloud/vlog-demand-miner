@@ -1,8 +1,8 @@
-# cheat-on-content Integration Matrix
+# NextTake Content Engine Integration Matrix
 
 ## Upstream
 
-- Repository: `https://github.com/XBuilderLAB/cheat-on-content.git`
+- Repository: `UPSTREAM.md`
 - Commit: `9c42fe0c932fe81a12f07428492bdf7ae8488f41`
 - License: MIT
 - Local path: `vendor/content-engine/`
@@ -13,21 +13,21 @@ If upstream already owns the business semantics, NextTake calls or routes to it.
 
 | Capability | Owner | Preserved | Local validation | NextTake exposure | Offline demo |
 | --- | --- | --- | --- | --- | --- |
-| init | cheat-init | yes | source + required files | root Skill | fixture project |
-| benchmark import | cheat-learn-from | yes | source present | root Skill | no |
-| topic discussion/draft | cheat-seed | yes | source contract + source pack bridge | root Skill | representative fixture |
-| scoring | cheat-score | yes | source present | root Skill | representative fixture |
-| blind scoring | cheat-score-blind | yes | source + protocol present | cheat-predict route | representative fixture |
-| blind prediction | cheat-predict | yes | immutable section hash | root Skill | yes |
-| shoot registration | cheat-shoot | yes | source present | root Skill | state fixture |
-| manual publication | cheat-publish | yes | source present | root Skill | state fixture |
-| performance retro | cheat-retro | yes | raw metric validation + native report path | root Skill | yes |
-| audience persona | cheat-persona | yes | native file projection | root Skill | yes |
-| next recommendation | cheat-recommend | yes | native file projection | root Skill | yes |
-| rubric bump | cheat-bump | yes | source/protocol present | root Skill | no, requires history |
-| trends | cheat-trends | yes | adapters preserved | root Skill | no network in demo |
-| status | cheat-status | yes | source present | root Skill | no |
-| migrations | cheat-migrate | yes | migration chain preserved | root Skill | no |
+| init | initialize | yes | source + required files | root Skill | fixture project |
+| benchmark import | learn-from | yes | source present | root Skill | no |
+| topic discussion/draft | ideate | yes | source contract + source pack bridge | root Skill | representative fixture |
+| scoring | score | yes | source present | root Skill | representative fixture |
+| blind scoring | score-blind | yes | source + protocol present | predict route | representative fixture |
+| blind prediction | predict | yes | immutable section hash | root Skill | yes |
+| shoot registration | shoot | yes | source present | root Skill | state fixture |
+| manual publication | publish | yes | source present | root Skill | state fixture |
+| performance retro | retro | yes | raw metric validation + native report path | root Skill | yes |
+| audience persona | persona | yes | native file projection | root Skill | yes |
+| next recommendation | recommend | yes | native file projection | root Skill | yes |
+| rubric bump | calibrate | yes | source/protocol present | root Skill | no, requires history |
+| trends | trends | yes | adapters preserved | root Skill | no network in demo |
+| status | status | yes | source present | root Skill | no |
+| migrations | migrate | yes | migration chain preserved | root Skill | no |
 | Douyin performance adapter | upstream adapter | yes | VDM resolver/provider tests | provider route | no login in demo |
 | Bilibili/XHS/LinkedIn adapters | upstream adapters | yes | source preserved | upstream only | no |
 
@@ -41,7 +41,7 @@ If upstream already owns the business semantics, NextTake calls or routes to it.
 
 ## Non-Goals
 
-- Reimplementing any `cheat-*` lifecycle;
+- Reimplementing any internal content lifecycle;
 - claiming all external adapters work without login and platform verification;
 - automatic publishing or draft upload;
 - copying browser profiles, cookies, tokens or private creator data into the repository.

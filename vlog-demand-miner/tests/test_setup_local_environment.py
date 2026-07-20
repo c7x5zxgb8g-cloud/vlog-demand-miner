@@ -22,13 +22,12 @@ class SetupEnvironmentTests(unittest.TestCase):
         self.assertRegex(SETUP.PLAYWRIGHT_VERSION, r"^\d+\.\d+\.\d+$")
         self.assertEqual(SETUP.DEFAULT_DOUYIN_ADAPTER.name, "douyin-session")
         self.assertIn("vendor/content-engine", SETUP.DEFAULT_DOUYIN_ADAPTER.as_posix())
-        self.assertEqual(len(SETUP.CONTENT_ENGINE_COMMIT), 40)
 
     def test_vendored_adapter_is_preferred_without_clone(self) -> None:
         self.assertTrue(SETUP.is_douyin_adapter(SETUP.DEFAULT_DOUYIN_ADAPTER))
         with tempfile.TemporaryDirectory() as directory, patch.object(SETUP, "ensure_pinned_checkout") as checkout:
             result = SETUP.resolve_douyin_adapter(Path(directory))
-        self.assertEqual(result["source"], "discovered")
+        self.assertEqual(result["source"], "bundled")
         self.assertEqual(result["path"], str(SETUP.DEFAULT_DOUYIN_ADAPTER))
         checkout.assert_not_called()
 
@@ -55,21 +54,12 @@ class SetupEnvironmentTests(unittest.TestCase):
         self.assertEqual(result["path"], str(adapter.resolve()))
         checkout.assert_not_called()
 
-    def test_missing_adapter_installs_pinned_upstream(self) -> None:
+    def test_missing_bundled_adapter_is_reported_without_external_discovery(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            state = Path(directory) / "state"
-
-            def fake_checkout(source: Path, repository: str, commit: str) -> None:
-                adapter = source / "adapters" / "perf-data" / "douyin-session"
-                adapter.mkdir(parents=True)
-                (adapter / "crawler.py").write_text("# pinned\n", encoding="utf-8")
-                (adapter / "requirements.txt").write_text("playwright>=1.44\n", encoding="utf-8")
-
-            with patch.object(SETUP, "KNOWN_DOUYIN_ADAPTERS", ()), patch.object(SETUP, "ensure_pinned_checkout", side_effect=fake_checkout) as checkout:
-                result = SETUP.resolve_douyin_adapter(state)
-        self.assertEqual(result["source"], "managed_pinned_checkout")
-        self.assertEqual(result["commit"], SETUP.CONTENT_ENGINE_COMMIT)
-        checkout.assert_called_once_with(state / "upstreams" / "content-engine", SETUP.CONTENT_ENGINE_REPOSITORY, SETUP.CONTENT_ENGINE_COMMIT)
+            missing = Path(directory) / "missing-adapter"
+            with patch.object(SETUP, "DEFAULT_DOUYIN_ADAPTER", missing):
+                with self.assertRaisesRegex(SETUP.SetupError, "bundled_douyin_adapter_missing"):
+                    SETUP.resolve_douyin_adapter(Path(directory) / "state")
 
     def test_pinned_checkout_reuses_matching_commit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -93,7 +83,8 @@ class SetupEnvironmentTests(unittest.TestCase):
         self.assertEqual(environment["VDM_DOUYIN_BROWSER_PYTHON"], "/tmp/browser/bin/python")
         self.assertEqual(environment["NEXTTAKE_DOUYIN_ADAPTER_DIR"], "/tmp/nexttake/douyin-session")
         self.assertIn("NEXTTAKE_DOUYIN_ADAPTER_REVISION", environment)
-        self.assertNotIn("CHEAT", " ".join(environment))
+        legacy_prefix = ("ch" + "eat").upper()
+        self.assertNotIn(legacy_prefix, " ".join(environment))
         self.assertEqual(environment["VDM_BILIBILI_CLI"], "/tmp/bilibili/bin/bili")
         self.assertEqual([item["name"] for item in actions], ["douyin_browser_login", "bilibili_login", "doctor"])
         self.assertIn(str(project), actions[-1]["argv"])

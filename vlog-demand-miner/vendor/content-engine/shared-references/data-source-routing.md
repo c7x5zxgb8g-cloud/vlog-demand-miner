@@ -1,6 +1,6 @@
 # Data Source Routing — 热点工具的触发与路由协议
 
-被 cheat-seed / cheat-trends 引用。规定**何时**调热点工具、**调哪个**、**不调时怎么办**。
+被 ideate / trends 引用。规定**何时**调热点工具、**调哪个**、**不调时怎么办**。
 
 ---
 
@@ -12,20 +12,20 @@
 > - 用户在**找素材**（没想法 / 要批量 / 显式抓热点）→ **调**，按 content_form 路由数据源
 > - 用户在**确认 angle**（讲了时事话题）→ **不主动调**，让用户决定要不要外部数据作参考
 
-设计目的：保护 cheat-seed 的核心论点——"好内容来自用户的真实经历，AI 不凭空 brainstorm"——同时不让"完全没想法"的新博主卡死。
+设计目的：保护 ideate 的核心论点——"好内容来自用户的真实经历，AI 不凭空 brainstorm"——同时不让"完全没想法"的新博主卡死。
 
 ---
 
-## 触发矩阵（被 cheat-seed Phase 1 引用）
+## 触发矩阵（被 ideate Phase 1 引用）
 
-| cheat-seed Mode | 默认调？ | 触发条件 |
+| ideate Mode | 默认调？ | 触发条件 |
 |---|---|---|
 | **Mode A**（用户给了具体经历/topic） | ❌ 默认不调 | 仅当用户讲的本身是时事话题（含产品名/人名/事件名 + 时间词）+ 用户**主动同意** |
 | **Mode B**（方向不具体，问"为什么"） | ❌ **永远不调** | 这阶段用户在内省，外部素材是噪音 |
 | **Mode C**（完全没想法） | ✅ 默认调 | Mode C 的核心动作就是把外部素材摆出来 |
 | `--batch N` | ✅ 默认调 | 批量 brainstorm 必须有 anchor |
-| `/cheat-trends` 显式 | ✅ 调 | 主入口，无需解释 |
-| `/cheat-recommend` | ❌ 默认不调 | 已有 pool；除非 pool >7 天没更新 → 提示先 trends |
+| `/trends` 显式 | ✅ 调 | 主入口，无需解释 |
+| `/recommend` | ❌ 默认不调 | 已有 pool；除非 pool >7 天没更新 → 提示先 trends |
 
 ---
 
@@ -73,7 +73,7 @@
 
 ### 用户层覆盖
 
-`.cheat-state.json` 的 `enabled_trend_sources` 字段是**显式开关**：
+`.nexttake-state.json` 的 `enabled_trend_sources` 字段是**显式开关**：
 
 ```json
 "enabled_trend_sources": ["aihot", "trendradar-mcp", "manual-paste"]
@@ -81,14 +81,14 @@
 
 数组里有的才会被调。空数组 → 仅走 manual-paste。
 
-cheat-trends 显式调用时支持 override：`/cheat-trends — sources: aihot`（仅这次用 aihot）。
+trends 显式调用时支持 override：`/trends — sources: aihot`（仅这次用 aihot）。
 
 ---
 
 ## 失败降级链
 
 ```
-[cheat-seed Mode C 触发拉热点]
+[ideate Mode C 触发拉热点]
   ↓
 [按 content_form 选主调]
   ↓
@@ -103,7 +103,7 @@ cheat-trends 显式调用时支持 override：`/cheat-trends — sources: aihot`
   └─ 用户当前没启用任何 source → 提示如何启用 + 这次直接走 manual-paste
 ```
 
-**关键纪律**：所有失败都**不抛异常**。cheat-seed 永远能跑——区别只是有没有外部素材。
+**关键纪律**：所有失败都**不抛异常**。ideate 永远能跑——区别只是有没有外部素材。
 
 ---
 
@@ -128,12 +128,12 @@ cheat-trends 显式调用时支持 override：`/cheat-trends — sources: aihot`
 
 ```
 [trend tool] → items
-  → 去重（vs candidates.md / predictions/ / .cheat-cache/trends-history.jsonl）
-  → 粗打分（cheat-seed 内联 rubric）
+  → 去重（vs candidates.md / predictions/ / .nexttake-cache/trends-history.jsonl）
+  → 粗打分（ideate 内联 rubric）
   → 写入 candidates.md（带 source 字段标明来自哪个 adapter）
 ```
 
-cheat-seed Mode C 拿到数据后**不**直接进 brainstorm，先入 candidates.md，再让 Claude 从池子里选。这样数据可追溯、可被后续 cheat-recommend 复用。
+ideate Mode C 拿到数据后**不**直接进 brainstorm，先入 candidates.md，再让 Claude 从池子里选。这样数据可追溯、可被后续 recommend 复用。
 
 ---
 
@@ -143,7 +143,7 @@ cheat-seed Mode C 拿到数据后**不**直接进 brainstorm，先入 candidates
 
 1. 写 `adapters/trend-sources/<name>.md`，按现有 aihot.md / trendradar-mcp.md 的格式
 2. 在本文件"数据源路由"段加一行——明确该 adapter 适合的 content_form
-3. 不需要改 cheat-seed 内部逻辑——按 `enabled_trend_sources` 自动启用
+3. 不需要改 ideate 内部逻辑——按 `enabled_trend_sources` 自动启用
 4. CHANGELOG 标 MINOR
 
-不要把硬编码"aihot"/"trendradar-mcp" 写进 cheat-seed WORKFLOW.md——保持 adapter 模型可扩展。
+不要把硬编码"aihot"/"trendradar-mcp" 写进 ideate WORKFLOW.md——保持 adapter 模型可扩展。

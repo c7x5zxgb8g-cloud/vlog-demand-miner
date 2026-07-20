@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# cheat-on-content / install.sh
+# NextTake Content Engine / install.sh
 #
 # Symlinks the 15 sub-skills into Claude Code and/or Codex skill directories so
 # agents can find them globally. Re-runnable safely (overwrite after confirmation).
 #
 # After install, in any content project directory: open Claude Code → say "初始化"
-# → /cheat-init runs the onboarding.
+# → /initialize runs the onboarding.
 #
 # To uninstall: bash uninstall.sh
 #
@@ -17,32 +17,33 @@
 #   bash install.sh --all              # install for Claude Code and Codex
 #   bash install.sh --codex --copy     # Codex install, copy mode
 #   bash install.sh --reinstall-hooks <project-dir>
-#                                      # rewrite hook scripts in an existing user project's .cheat-hooks/
+#                                      # rewrite hook scripts in an existing user project's .nexttake-hooks/
 #                                      # (use after git pull when CHANGELOG mentions hook script changes;
-#                                      #  does NOT touch .cheat-state.json or any user data)
+#                                      #  does NOT touch .nexttake-state.json or any user data)
 
 set -euo pipefail
 
 SUB_SKILLS=(
-  cheat-init
-  cheat-learn-from
-  cheat-seed
-  cheat-score
-  cheat-score-blind
-  cheat-predict
-  cheat-shoot
-  cheat-publish
-  cheat-retro
-  cheat-persona
-  cheat-bump
-  cheat-recommend
-  cheat-trends
-  cheat-status
-  cheat-migrate
+  initialize
+  learn-from
+  ideate
+  score
+  score-blind
+  predict
+  shoot
+  publish
+  retro
+  persona
+  calibrate
+  recommend
+  trends
+  status
+  migrate
 )
 
 CLAUDE_SKILLS=("${SUB_SKILLS[@]}")
-CODEX_SKILLS=(cheat-on-content "${SUB_SKILLS[@]}")
+ENGINE_SKILL="nexttake-content-engine"
+CODEX_SKILLS=("$ENGINE_SKILL" "${SUB_SKILLS[@]}")
 
 # Resolve the directory containing THIS script (the source root) — needed early for both modes
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -55,20 +56,20 @@ if [[ "${1:-}" == "--reinstall-hooks" ]]; then
   PROJECT_DIR="${2:-}"
   if [[ -z "$PROJECT_DIR" ]]; then
     echo "❌ Usage: bash install.sh --reinstall-hooks <path-to-user-project>"
-    echo "   The user project must already have been initialized via /cheat-init."
+    echo "   The user project must already have been initialized via /initialize."
     exit 1
   fi
   if [[ ! -d "$PROJECT_DIR" ]]; then
     echo "❌ Project dir not found: $PROJECT_DIR"
     exit 1
   fi
-  if [[ ! -f "$PROJECT_DIR/.cheat-state.json" ]]; then
-    echo "❌ $PROJECT_DIR is not a cheat-on-content project (no .cheat-state.json)."
-    echo "   Run /cheat-init in that directory first."
+  if [[ ! -f "$PROJECT_DIR/.nexttake-state.json" ]]; then
+    echo "❌ $PROJECT_DIR is not a NextTake Content Engine project (no .nexttake-state.json)."
+    echo "   Run /initialize in that directory first."
     exit 1
   fi
 
-  HOOK_DST="$PROJECT_DIR/.cheat-hooks"
+  HOOK_DST="$PROJECT_DIR/.nexttake-hooks"
   mkdir -p "$HOOK_DST"
 
   echo ""
@@ -80,7 +81,7 @@ if [[ "${1:-}" == "--reinstall-hooks" ]]; then
     if [[ -f "$SCRIPT_DIR/hooks/$hook_script" ]]; then
       cp "$SCRIPT_DIR/hooks/$hook_script" "$HOOK_DST/$hook_script"
       chmod +x "$HOOK_DST/$hook_script"
-      echo "  ✓ updated: .cheat-hooks/$hook_script"
+      echo "  ✓ updated: .nexttake-hooks/$hook_script"
     else
       echo "  ⚠️  missing in source: hooks/$hook_script (skipped)"
     fi
@@ -90,11 +91,11 @@ if [[ "${1:-}" == "--reinstall-hooks" ]]; then
   echo "✅ Hook scripts reinstalled."
   echo ""
   echo "Note: This did NOT touch:"
-  echo "  - .cheat-state.json (your data)"
-  echo "  - .claude/settings.json (hook registration — should still point at .cheat-hooks/)"
+  echo "  - .nexttake-state.json (your data)"
+  echo "  - .claude/settings.json (hook registration — should still point at .nexttake-hooks/)"
   echo "  - rubric_notes.md / predictions/ / videos/ (your work)"
   echo ""
-  echo "If schema also changed (CHANGELOG marks BREAKING), additionally run /cheat-migrate"
+  echo "If schema also changed (CHANGELOG marks BREAKING), additionally run /migrate"
   echo "in Claude Code from your project directory."
   echo ""
   exit 0
@@ -126,24 +127,24 @@ for arg in "$@"; do
   esac
 done
 
-# Sanity check: confirm we're in the cheat-on-content root
+# Sanity check: confirm we're in the NextTake Content Engine root
 if [[ ! -f "$SCRIPT_DIR/ENGINE.md" ]]; then
   echo "❌ Missing: $SCRIPT_DIR/ENGINE.md"
-  echo "   Are you running install.sh from the cheat-on-content root?"
+  echo "   Are you running install.sh from the NextTake Content Engine root?"
   exit 1
 fi
 
 for s in "${SUB_SKILLS[@]}"; do
   if [[ ! -f "$SCRIPT_DIR/skills/$s/WORKFLOW.md" ]]; then
     echo "❌ Missing: $SCRIPT_DIR/skills/$s/WORKFLOW.md"
-    echo "   Are you running install.sh from the cheat-on-content root?"
+    echo "   Are you running install.sh from the NextTake Content Engine root?"
     exit 1
   fi
 done
 
 skill_source() {
   local skill="$1"
-  if [[ "$skill" == "cheat-on-content" ]]; then
+  if [[ "$skill" == "$ENGINE_SKILL" ]]; then
     echo "$SCRIPT_DIR"
   else
     echo "$SCRIPT_DIR/skills/$skill"
@@ -185,7 +186,7 @@ install_skills() {
   mkdir -p "$target_dir"
 
   echo ""
-  echo "Installing cheat-on-content for $label (mode: $MODE)"
+  echo "Installing NextTake Content Engine for $label (mode: $MODE)"
   echo "  source: $SCRIPT_DIR"
   echo "  target: $target_dir/"
   echo ""
@@ -204,7 +205,7 @@ install_skills() {
       echo "  ✓ symlinked: $s"
     else
       cp -R "$src" "$dst"
-      if [[ "$s" == "cheat-on-content" ]]; then
+      if [[ "$s" == "$ENGINE_SKILL" ]]; then
         rm -rf "$dst/.git"
       fi
       echo "  ✓ copied:    $s"
@@ -249,13 +250,13 @@ echo "  2. Open Claude Code or Codex in that directory"
 echo ""
 echo "  3. In the chat, say:"
 echo "       初始化"
-echo "       (or: 初始化 cheat-on-content)"
+echo "       (or: 初始化 NextTake Content Engine)"
 echo ""
 if [[ "$TARGET_AGENT" == "claude" || "$TARGET_AGENT" == "all" ]]; then
-  echo "Verify Claude install: ls -la ~/.claude/skills/ | grep cheat"
+  echo "Verify Claude install: ls -la ~/.claude/skills/ | grep nexttake"
 fi
 if [[ "$TARGET_AGENT" == "codex" || "$TARGET_AGENT" == "all" ]]; then
-  echo "Verify Codex install:  ls -la ~/.codex/skills/ | grep cheat"
+  echo "Verify Codex install:  ls -la ~/.codex/skills/ | grep nexttake"
   echo "Note: restart Codex if the new skills do not appear in the current session."
 fi
 echo ""

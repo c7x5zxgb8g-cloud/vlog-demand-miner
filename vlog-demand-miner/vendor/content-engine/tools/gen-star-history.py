@@ -23,7 +23,7 @@ import random
 import subprocess
 import sys
 
-REPO = "XBuilderLAB/cheat-on-content"
+REPO = "c7x5zxgb8g-cloud/vlog-demand-miner"
 HERE = os.path.dirname(__file__)
 OUT = os.path.join(HERE, "..", "docs", "star-history.svg")
 FONT_CSS = os.path.join(HERE, "xkcd-font.css")

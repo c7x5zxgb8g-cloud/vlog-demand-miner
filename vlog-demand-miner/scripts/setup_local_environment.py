@@ -18,8 +18,6 @@ from urllib.request import Request, urlopen
 
 BILIBILI_REPOSITORY = "https://github.com/public-clis/bilibili-cli.git"
 BILIBILI_COMMIT = "dbe28551930df43b633baa52e9639832aeada967"
-CONTENT_ENGINE_REPOSITORY = "https://github.com/XBuilderLAB/cheat-on-content.git"
-CONTENT_ENGINE_COMMIT = "9c42fe0c932fe81a12f07428492bdf7ae8488f41"
 MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
 MODEL_SHA256 = "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
 MODEL_BYTES = 147_951_465
@@ -28,16 +26,9 @@ PLAYWRIGHT_VERSION = "1.55.0"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_ENGINE_ROOT = Path(
     os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
-    or os.getenv("VDM_CHEAT_ROOT")
     or str(SKILL_ROOT / "vendor" / "content-engine")
 ).expanduser().resolve()
 DEFAULT_DOUYIN_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
-KNOWN_DOUYIN_ADAPTERS = (
-    DEFAULT_DOUYIN_ADAPTER,
-    Path.home() / ".cc-switch" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
-    Path.home() / ".codex" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
-    Path.home() / ".agents" / "skills" / "cheat-on-content" / "adapters" / "perf-data" / "douyin-session",
-)
 
 
 class SetupError(RuntimeError):
@@ -154,21 +145,16 @@ def ensure_pinned_checkout(source: Path, repository: str, commit: str) -> None:
 
 
 def resolve_douyin_adapter(state_dir: Path, configured: str | None = None) -> dict[str, str]:
+    del state_dir
     if configured:
         adapter = Path(configured).expanduser().resolve()
         if not is_douyin_adapter(adapter):
             raise SetupError(f"configured_douyin_adapter_invalid:{adapter}")
         return {"path": str(adapter), "source": "configured", "revision": content_revision(adapter)}
-    for candidate in KNOWN_DOUYIN_ADAPTERS:
-        adapter = candidate.expanduser().resolve()
-        if is_douyin_adapter(adapter):
-            return {"path": str(adapter), "source": "discovered", "revision": content_revision(adapter)}
-    source = state_dir / "upstreams" / "content-engine"
-    ensure_pinned_checkout(source, CONTENT_ENGINE_REPOSITORY, CONTENT_ENGINE_COMMIT)
-    adapter = source / "adapters" / "perf-data" / "douyin-session"
+    adapter = DEFAULT_DOUYIN_ADAPTER.expanduser().resolve()
     if not is_douyin_adapter(adapter):
-        raise SetupError("pinned_douyin_adapter_missing")
-    return {"path": str(adapter), "source": "managed_pinned_checkout", "commit": CONTENT_ENGINE_COMMIT, "revision": content_revision(adapter)}
+        raise SetupError("bundled_douyin_adapter_missing")
+    return {"path": str(adapter), "source": "bundled", "revision": content_revision(adapter)}
 
 
 def browser_runtime_ready(executable: Path) -> bool:
@@ -299,9 +285,8 @@ def main() -> int:
     parser.add_argument("--skip-asr", action="store_true", help="Repair/test providers without changing the default full installation")
     parser.add_argument("--skip-bilibili", action="store_true")
     parser.add_argument("--skip-douyin-browser", action="store_true")
-    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR")
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR")
     parser.add_argument("--douyin-adapter-dir", dest="douyin_adapter_dir", default=adapter_default)
-    parser.add_argument("--cheat-douyin-adapter-dir", dest="douyin_adapter_dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if platform.system() != "Darwin":
         print(json.dumps({"status": "unsupported", "error": "macos_runtime_required"}, ensure_ascii=False))

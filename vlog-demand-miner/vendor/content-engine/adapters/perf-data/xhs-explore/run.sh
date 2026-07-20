@@ -2,7 +2,7 @@
 #
 # xhs-explore adapter wrapper（小红书）
 #
-# Called by /cheat-retro when state.data_collection=adapter and platform=xhs.
+# Called by /retro when state.data_collection=adapter and platform=xhs.
 #
 # Usage:
 #   bash run.sh <note_id> <video_folder> [<script_path>]
@@ -32,13 +32,13 @@ ADAPTER_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd 
 
 # Find Python — prefer venv in user's project root if exists
 PYTHON=""
-# Walk up from VIDEO_FOLDER to find project root (.cheat-state.json)
+# Walk up from VIDEO_FOLDER to find project root (.nexttake-state.json)
 PROJECT_ROOT="$( realpath "$VIDEO_FOLDER" )"
-while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; do
+while [[ "$PROJECT_ROOT" != "/" && ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; do
   PROJECT_ROOT="$( dirname "$PROJECT_ROOT" )"
 done
-if [[ ! -f "$PROJECT_ROOT/.cheat-state.json" ]]; then
-  echo "❌ Cannot find project root (.cheat-state.json) from $VIDEO_FOLDER" >&2
+if [[ ! -f "$PROJECT_ROOT/.nexttake-state.json" ]]; then
+  echo "❌ Cannot find project root (.nexttake-state.json) from $VIDEO_FOLDER" >&2
   exit 3
 fi
 if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
@@ -66,7 +66,7 @@ Install in your project venv:
   pip install -r "$ADAPTER_DIR/requirements.txt"
   playwright install chromium
 
-Then re-run /cheat-retro.
+Then re-run /retro.
 EOF
   exit 2
 fi
@@ -96,8 +96,8 @@ fi
 
 # Run from PROJECT_ROOT so .auth-xhs/ is found and outputs go to expected paths
 cd "$PROJECT_ROOT"
-export CHEAT_PROJECT_ROOT="$PROJECT_ROOT"
-export CHEAT_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"
+export NEXTTAKE_PROJECT_ROOT="$PROJECT_ROOT"
+export NEXTTAKE_VIDEOS_DIR="$( dirname "$VIDEO_FOLDER" )"
 
 echo "[xhs-explore] fetching note_id=$NOTE_ID into $VIDEO_FOLDER"
 if [[ -n "$SCRIPT_ARG" ]]; then
@@ -106,7 +106,7 @@ else
   "$PYTHON" "$ADAPTER_DIR/review.py" note "$NOTE_ID"
 fi
 
-# review.py writes to CHEAT_VIDEOS_DIR/<auto-named-folder>/report.md.
+# review.py writes to NEXTTAKE_VIDEOS_DIR/<auto-named-folder>/report.md.
 # Move the just-written report into our canonical video_folder if names differ.
 LATEST_REPORT=$(find "$( dirname "$VIDEO_FOLDER" )" -name "report.md" -newer "$VIDEO_FOLDER" -type f 2>/dev/null | head -1)
 if [[ -n "$LATEST_REPORT" && "$( dirname "$LATEST_REPORT" )" != "$VIDEO_FOLDER" ]]; then

@@ -1,11 +1,11 @@
 ---
-name: cheat-bump
-description: 提议并执行 rubric 或 bucket 升级。两种模式：**完整 rubric bump**（最高风险动作，5 步强制 + 跨模型审核）和 **--bucket-only 轻量重校**（只换 bucket 边界，不动 rubric 公式）。**Phase 2 强制走 cheat-score-blind sub-agent 给校准池重打分**——不接受 self-scored fallback。触发词："升级 rubric"/"bump rubric"/"更新公式"/"我想加一个维度"/"调整权重"/"重校桶"/"recalibrate bucket"。
+name: calibrate
+description: 提议并执行 rubric 或 bucket 升级。两种模式：**完整 rubric bump**（最高风险动作，5 步强制 + 跨模型审核）和 **--bucket-only 轻量重校**（只换 bucket 边界，不动 rubric 公式）。**Phase 2 强制走 score-blind sub-agent 给校准池重打分**——不接受 self-scored fallback。触发词："升级 rubric"/"bump rubric"/"更新公式"/"我想加一个维度"/"调整权重"/"重校桶"/"recalibrate bucket"。
 argument-hint: --propose "<...>" | --bucket-only [--scheme ratio|absolute|percentile]
 allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-chat__chat
 ---
 
-# /cheat-bump — Rubric / Bucket 升级
+# /calibrate — Rubric / Bucket 升级
 
 两种模式：
 
@@ -19,7 +19,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-cha
 ## Overview
 
 ```
-入口：用户触发 /cheat-bump
+入口：用户触发 /calibrate
   ↓
 [Phase A0: 检测调用模式]
   ↓
@@ -70,7 +70,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-cha
   - **Claude 也可以拒绝 bump**（即使样本足）如果证据弱：
     - N=10 但观察都是低置信度的零碎 pattern，无清晰方向
     - 用户复盘时大量"随便看了下"的非严肃判断
-  - **写在 prediction header 或 cheat-bump 输出时必说明**：本次提议是 default-aligned 还是 judgment-driven，给用户审视依据
+  - **写在 prediction header 或 calibrate 输出时必说明**：本次提议是 default-aligned 还是 judgment-driven，给用户审视依据
 - **THRESHOLD = 0.8** — 新排序与实绩排序一致性阈值（4/5）。这条**写死**——bump 验证的统计刚性
 - **CROSS_MODEL_AUDIT = true** — 调外部 LLM 独立审核。false 仅用于离线
 - **REQUIRE_CONFIRM = true** — 落地前要求用户明确"yes, bump"
@@ -82,7 +82,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-cha
 | `--propose` 文本 | 用户参数；缺失则询问 |
 | `rubric_notes.md` | 用户项目根 |
 | `predictions/*.md` 全量 | 校准池数据 |
-| `.cheat-state.json` | 状态 |
+| `.nexttake-state.json` | 状态 |
 
 ## Workflow
 
@@ -124,25 +124,25 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, Grep, Skill, Task, mcp__llm-cha
 
 Glob `predictions/*.md` 中所有有完整复盘段的文件 → 校准池。
 
-**bump 是工具最高风险动作——所有重打必须走 [cheat-score-blind](../cheat-score-blind/WORKFLOW.md) sub-agent**。inline 重打 = 主 Claude 已经看过实绩，rank 一致性变成 overfit 而非真信号。
+**bump 是工具最高风险动作——所有重打必须走 [score-blind](../score-blind/WORKFLOW.md) sub-agent**。inline 重打 = 主 Claude 已经看过实绩，rank 一致性变成 overfit 而非真信号。
 
 #### 强制约束
 
-- **不接受 self-scored fallback**——`/cheat-predict` 有 `--skip-blind` flag，但 `/cheat-bump` **没有**。如果 Task tool 不可用 → **abort bump**，向用户报告"先解决 Task tool 再 bump"
+- **不接受 self-scored fallback**——`/predict` 有 `--skip-blind` flag，但 `/calibrate` **没有**。如果 Task tool 不可用 → **abort bump**，向用户报告"先解决 Task tool 再 bump"
 - **不接受"我只重算 composite 不重打 dim"** —— 即使新公式只调权重不加维度，每条 prediction 的所有 dim 都要由 sub-agent 重新审 script。理由：旧 dim 分本身可能是污染的；权重变了不能保证旧 dim 还成立
 
 #### 对每篇 prediction：
 
 1. 解析 prediction 文件拿到对应 `scripts/<id>.md` 路径（从 `Script Path` header 字段）
 2. 校验 script 文件存在 + hash 跟 header `Script Hash` 一致；不一致 → 警告（script 改过了）但仍 spawn sub-agent
-3. **通过 Task tool spawn cheat-score-blind sub-agent**：
+3. **通过 Task tool spawn score-blind sub-agent**：
    ```
-   Spawn cheat-score-blind sub-agent.
+   Spawn score-blind sub-agent.
 
    Input:
      script_path: <prediction header 的 Script Path>
      rubric_notes_path: rubric_notes.md
-     sidecar_path: .cheat-cache/bump-rescores/<prediction-id>.json
+     sidecar_path: .nexttake-cache/bump-rescores/<prediction-id>.json
 
    Task: 按 rubric_notes 当前公式（已是新版 vN+1）给 script 打分。
    返回严格 JSON。写 sidecar 文件用于 bump 主流程批量读取。
@@ -152,7 +152,7 @@ Glob `predictions/*.md` 中所有有完整复盘段的文件 → 校准池。
    不要读这份 prediction 文件本身 —— 你只看 script + rubric。
    ```
 4. 等 sub-agent 完成 → 读 sidecar JSON → 主流程用新公式算 composite
-5. 写"重打表"到 `.cheat-cache/bump-rescores.json`（汇总）。**每条 entry 标 `blind: true`** —— bump phase 5 cleanup 时把这个字段连同新分数写到 prediction 文件的 `Re-scored under v<N+1>` 行
+5. 写"重打表"到 `.nexttake-cache/bump-rescores.json`（汇总）。**每条 entry 标 `blind: true`** —— bump phase 5 cleanup 时把这个字段连同新分数写到 prediction 文件的 `Re-scored under v<N+1>` 行
 
 #### 还污染没污染的诚实标注
 
@@ -171,7 +171,7 @@ Glob `predictions/*.md` 中所有有完整复盘段的文件 → 校准池。
 |---|---|
 | 某条 prediction 的 script 文件不见了 | sub-agent skip 该条，主流程汇总报告"N 条因 script 缺失被排除"。如剩余有效池 < MIN_SAMPLES → abort bump |
 | sub-agent 返回 `refusal != null` | 重发 Task 最多 3 次；仍败 → 该条标 `rescore_failed: true` 排除出校准池 |
-| Task tool 整个不可用 | abort bump，提示用户"Task tool 是 bump 的硬依赖。如真的离线环境，跑 `/cheat-bump --bucket-only` 走轻量分支" |
+| Task tool 整个不可用 | abort bump，提示用户"Task tool 是 bump 的硬依赖。如真的离线环境，跑 `/calibrate --bucket-only` 走轻量分支" |
 | sub-agent 输出含 contamination_signal | 标 `suspicious: true` 但不排除——bump report 末尾列这些可疑条目让用户审 |
 
 ### Phase 3: 计算排序一致性
@@ -240,7 +240,7 @@ prompt:
 
 `CROSS_MODEL_AUDIT=false`：
 - 仅依赖本地判定
-- state file 持续标记，cheat-status 持续提示用户"这次 bump 是自审，建议配置 mcp__llm-chat__chat"
+- state file 持续标记，status 持续提示用户"这次 bump 是自审，建议配置 mcp__llm-chat__chat"
 
 ### Phase 5: 落地 + cleanup pass
 
@@ -297,7 +297,7 @@ prompt:
 
 ---
 **Re-scored under v2.1 on 2026-05-04**: composite=8.24 → 9.11 (blind: true)
-（rubric bump 时全量重算，由 cheat-score-blind sub-agent 独立打分；详见 rubric-memo.md 的 v2 → v2.1 升级 Memo）
+（rubric bump 时全量重算，由 score-blind sub-agent 独立打分；详见 rubric-memo.md 的 v2 → v2.1 升级 Memo）
 ```
 
 `blind: true` 字段**必填**——告诉未来读这条记录的人"这是 channel B 隔离打分，不是主 Claude 自评"。如果某条 prediction 在 Phase 2 因 sub-agent 失败被排除 → 不会有 Re-scored 行（保持原样）。
@@ -341,7 +341,7 @@ Cleanup pass：删除观察 D 和 E（已吸收为 QL 重定义和 MS 维度）
 
 ## Phase B：bucket-only 重校（轻量分支）
 
-`/cheat-bump --bucket-only [--scheme ratio|absolute|percentile]`
+`/calibrate --bucket-only [--scheme ratio|absolute|percentile]`
 
 **与完整 bump 的本质区别**：bucket 边界不是规则的一部分，是数据派生量。重新派生它**不需要跨模型审核**——派生算法是确定性的，没有"判断"成分。
 
@@ -427,13 +427,13 @@ baseline: 4.2w 中位数（基于 5 篇校准样本）
 
 用户确认后：
 1. 编辑 `rubric_notes.md` 的 "Bucket 方案" 段，替换为新表
-2. 更新 `.cheat-state.json` 的 `baseline_plays` 字段（bucket scheme 不持久化——下次 cheat-predict 实时派生）
+2. 更新 `.nexttake-state.json` 的 `baseline_plays` 字段（bucket scheme 不持久化——下次 predict 实时派生）
 3. 在 `rubric_notes.md` 的 bucket 段顶部追加一行变更记录：`v2 buckets recalibrated on YYYY-MM-DD: scheme=absolute, baseline=4.2w (基于 N=10 个样本)`
 4. **不**修改任何 prediction 文件——历史预测的 bucket 标签保持原样（在该样本写入时的方案下做出的判断）
 
 ### B5: 对未来预测的影响
 
-下一次 `/cheat-predict` 起按新 bucket 派生。历史 prediction 文件里的 bucket 标签**不重算**——bucket 是预测时的语义判断，事后改写会破坏盲度。
+下一次 `/predict` 起按新 bucket 派生。历史 prediction 文件里的 bucket 标签**不重算**——bucket 是预测时的语义判断，事后改写会破坏盲度。
 
 ### Phase B 不做的事
 
@@ -456,7 +456,7 @@ baseline: 4.2w 中位数（基于 5 篇校准样本）
 ## Refusals
 
 - 「跳过校准池重打，直接换公式」 → 拒绝。原则 #2
-- 「跳过 cheat-score-blind sub-agent，主 Claude 直接重打就行」 → 拒绝。bump **不接受**任何 self-scored fallback——sub-agent 不可用 → abort bump，不接受"自审"
+- 「跳过 score-blind sub-agent，主 Claude 直接重打就行」 → 拒绝。bump **不接受**任何 self-scored fallback——sub-agent 不可用 → abort bump，不接受"自审"
 - 「跳过外部 LLM 审核」 → 仅当 `CROSS_MODEL_AUDIT=false` 显式设置
 - 「这次 THRESHOLD 调到 3/5 让它过」 → 拒绝。改 THRESHOLD 是元层级 bump
 - 「保留所有旧观察作为历史」 → 违反原则 #3
@@ -467,11 +467,11 @@ baseline: 4.2w 中位数（基于 5 篇校准样本）
 
 ## Integration
 
-- 上游：`/cheat-retro` 检测到 ≥3 同向偏差 → 提议跑 `/cheat-bump`
-- 依赖：`mcp__llm-chat__chat`（如配置）+ Task tool（spawn cheat-score-blind）
+- 上游：`/retro` 检测到 ≥3 同向偏差 → 提议跑 `/calibrate`
+- 依赖：`mcp__llm-chat__chat`（如配置）+ Task tool（spawn score-blind）
 - 修改：
   - `rubric_notes.md`（结构性更新，**绝不**写真实视频名 / 实绩）
   - `rubric-memo.md`（**新**——append Memo 全文，含证据 + 派生证据）
   - 所有 `predictions/*.md`（追加 Re-scored 行，不动预测段）
-  - `.cheat-state.json`
-- 下游：下一篇 `/cheat-predict` 自动按新 rubric_version 打分
+  - `.nexttake-state.json`
+- 下游：下一篇 `/predict` 自动按新 rubric_version 打分

@@ -1,11 +1,11 @@
 ---
-name: cheat-publish
+name: publish
 description: 登记一篇内容已发布，把 URL/平台 ID/发布时间写入对应预测文件 header 和 state file。这是一个轻量动作——只更新元数据，**不动预测段任何字符**。触发词："已发布"/"I shipped"/"发布链接是 X"/"刚发完 [url]"/"publish registered"。
 argument-hint: <prediction-file-or-url> [— platform: youtube|bilibili|douyin|...]
 allowed-tools: Bash(*), Read, Edit, Glob
 ---
 
-# /cheat-publish — 发布登记
+# /publish — 发布登记
 
 把作品的发布元数据（URL、发布时间、平台）补到预测文件 header 与 state file。**禁止改预测段**——hook 会拦。
 
@@ -20,7 +20,7 @@ allowed-tools: Bash(*), Read, Edit, Glob
   ↓
 [Phase 2: 更新 prediction 文件 header（仅 metadata 段）]
   ↓
-[Phase 3: 更新 .cheat-state.json，清除 in_progress_session]
+[Phase 3: 更新 .nexttake-state.json，清除 in_progress_session]
 ```
 
 ## Constants
@@ -32,8 +32,8 @@ allowed-tools: Bash(*), Read, Edit, Glob
 
 | 必填 | 来源 |
 |---|---|
-| `<prediction-file>` 或 URL | 用户参数；缺失则用 `.cheat-state.json` 的 `in_progress_session.file` |
-| `.cheat-state.json` | 用户项目根 |
+| `<prediction-file>` 或 URL | 用户参数；缺失则用 `.nexttake-state.json` 的 `in_progress_session.file` |
+| `.nexttake-state.json` | 用户项目根 |
 
 ## Workflow
 
@@ -41,7 +41,7 @@ allowed-tools: Bash(*), Read, Edit, Glob
 
 按优先级：
 1. 用户参数明确给了 prediction 文件路径 → 用它
-2. 用户参数只给了 URL → 读 `.cheat-state.json` 的 `in_progress_session.file`
+2. 用户参数只给了 URL → 读 `.nexttake-state.json` 的 `in_progress_session.file`
 3. 都没有 → 列出 `predictions/*.md` 中 header 没填 `published_at` 的文件，让用户选
 
 **警告路径**：若 `in_progress_session.file` 与用户给的 URL 时间差超过 14 天 → 提示"这个预测写于很久之前，确认是这篇？"
@@ -87,13 +87,13 @@ allowed-tools: Bash(*), Read, Edit, Glob
 - 小红书：note_id
 - YouTube：v= 参数后的 video_id
 
-如果用户给的是分享短链（无法立刻 resolve）→ 标 `Aweme ID: pending`，下次 `/cheat-retro` 时由 adapter 解析。
+如果用户给的是分享短链（无法立刻 resolve）→ 标 `Aweme ID: pending`，下次 `/retro` 时由 adapter 解析。
 
-**video folder 处理**：到 cheat-publish 这一步，对应的 `videos/<id>/` 目录**应该已经由 cheat-shoot 创建**（含 script.md）。
+**video folder 处理**：到 publish 这一步，对应的 `videos/<id>/` 目录**应该已经由 shoot 创建**（含 script.md）。
 
-- 如 video folder 不存在 → 警告"你跳过了 cheat-shoot？建议先跑 cheat-shoot 把拍摄稿登记进 video folder 再发"，**询问用户是否跳过登记直接发**：
+- 如 video folder 不存在 → 警告"你跳过了 shoot？建议先跑 shoot 把拍摄稿登记进 video folder 再发"，**询问用户是否跳过登记直接发**：
   - 是 → 自动建一个 video folder（fallback），但不询问稿子一致性，标 `ad_hoc_publish: true`
-  - 否 → 让用户先跑 cheat-shoot 再回来 publish
+  - 否 → 让用户先跑 shoot 再回来 publish
 
 用 Edit 工具（不是 Write 重写整个文件）。
 
@@ -120,11 +120,11 @@ allowed-tools: Bash(*), Read, Edit, Glob
 **`shoots` 队列处理**（buffer 跟踪关键）：
 1. 读 state.shoots[]
 2. 找 `video_folder == 本次发布的 video_folder` 的项 → 移除
-3. 如果没找到 → 警告"buffer 队列里没有这条视频。是直接发布没经过 /cheat-shoot 吗？"——不阻塞，但提示用户下次走 /cheat-shoot 让 buffer 跟踪准确
+3. 如果没找到 → 警告"buffer 队列里没有这条视频。是直接发布没经过 /shoot 吗？"——不阻塞，但提示用户下次走 /shoot 让 buffer 跟踪准确
 
-`last_published_platform_id` 是 cheat-retro 调 adapter 时的输入——如 douyin-session 需要 aweme_id 直接抓数据。
+`last_published_platform_id` 是 retro 调 adapter 时的输入——如 douyin-session 需要 aweme_id 直接抓数据。
 
-`pending_retros` 是待复盘列表——`cheat-status` 会基于这个列表 + RETRO_WINDOW_DAYS 显示"今天该复盘哪些"。
+`pending_retros` 是待复盘列表——`status` 会基于这个列表 + RETRO_WINDOW_DAYS 显示"今天该复盘哪些"。
 
 ### Phase 4: 提醒 + 下一步 + buffer 状态
 
@@ -151,8 +151,8 @@ Buffer 颜色由 [shared-references/cadence-protocol.md](../../shared-references
 ## Key Rules
 
 1. **不动预测段**。即使是修复笔误，也不允许在 publish 时改预测段
-2. **不抓数据**。publish 是登记动作，不是数据回收（那是 cheat-retro 的活）
-3. **state 字段名固定**。`pending_retros` / `last_published_at` 是其他子 skill（特别是 cheat-status / cheat-retro）依赖的契约
+2. **不抓数据**。publish 是登记动作，不是数据回收（那是 retro 的活）
+3. **state 字段名固定**。`pending_retros` / `last_published_at` 是其他子 skill（特别是 status / retro）依赖的契约
 4. **平台未知不强报**。无法识别 → 询问用户，允许 `platform: other` 作为兜底
 5. **重复登记需明示**。已有 published_at → 询问"覆盖？"，绝不静默覆盖
 
@@ -164,7 +164,7 @@ Buffer 颜色由 [shared-references/cadence-protocol.md](../../shared-references
 
 ## Integration
 
-- 上游：`/cheat-predict`（写出 prediction 文件并设 in_progress_session）
-- 下游：T+RETRO_WINDOW_DAYS 后 → `/cheat-retro`
-- `cheat-status` 用 `pending_retros` 字段计算"今天该复盘哪些"
-- 平台字段被 `cheat-retro` 用来路由到对应的 perf-data adapter（manual-paste / youtube-data-api / 等）
+- 上游：`/predict`（写出 prediction 文件并设 in_progress_session）
+- 下游：T+RETRO_WINDOW_DAYS 后 → `/retro`
+- `status` 用 `pending_retros` 字段计算"今天该复盘哪些"
+- 平台字段被 `retro` 用来路由到对应的 perf-data adapter（manual-paste / youtube-data-api / 等）

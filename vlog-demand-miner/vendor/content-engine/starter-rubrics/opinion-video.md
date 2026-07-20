@@ -113,7 +113,7 @@ composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 
 为什么重要：议题广度 ≠ 流量。一个"普世"但社交暴露的议题（如求职）跑不过一个"小众"但分享安全的议题（如吐槽老板）。**Shareability 才是约束变量，不是 breadth**。
 
-> **如果你想试 v2.1**：跑完 5 篇 v2 校准 + 主动收集 MS 和 TS 的"试评分"作为候选维度数据。证据足够（≥3 样本支持）后通过 `/cheat-bump` 走完整升级流程。
+> **如果你想试 v2.1**：跑完 5 篇 v2 校准 + 主动收集 MS 和 TS 的"试评分"作为候选维度数据。证据足够（≥3 样本支持）后通过 `/calibrate` 走完整升级流程。
 
 ---
 
@@ -121,7 +121,7 @@ composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 
 > ⚠️ **新人不要用这套绝对桶**。0 粉账号的视频典型在 100-1000 播放区间——照搬下表会让所有预测都落"底部 99%"。
 > Cold-start 用户请用 [opinion-video-zero.md](opinion-video-zero.md) 的**比率桶方案**。
-> Calibration 用户（≥5 篇有数据）由 `/cheat-init` 询问 baseline 后自动派生。
+> Calibration 用户（≥5 篇有数据）由 `/initialize` 询问 baseline 后自动派生。
 > 下表是"参考博主"（中文抖音观点视频，~1w 粉，25+ 已发样本）的实际拟合——**不是普适常量**。
 
 不要预测一个具体数字。预测一个 **bucket** + 概率分布。
@@ -136,7 +136,7 @@ composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 
 **重要**：按你的账号自己的 percentile 设 bucket 边界。你的"爆款"可能是 5w（参考博主级别）或 5k（新人级别）或 500w（大 V）。直接照抄上表的人会得到永远偏高 / 偏低的预测。
 
-校准过 ≥5 篇后跑 `/cheat-bump --bucket-only` 让系统基于你的实际分布自动派生。
+校准过 ≥5 篇后跑 `/calibrate --bucket-only` 让系统基于你的实际分布自动派生。
 
 每次预测要给：
 - **最可能的 bucket**（headline call）
@@ -187,9 +187,9 @@ composite = (ER×1.5 + SR×1.5 + HP×1.5 + QL + NA + AB + SAT) / 8.5 × 2.0
 
 ---
 
-## 与 `cheat-on-content` 子 skill 的对应
+## 与 `NextTake Content Engine` 子 skill 的对应
 
 这份 starter rubric 被以下 skill 读取：
-- `/cheat-init` cold-start 模式 → 默认复制本文件到 `rubric_notes.md`（如选择 calibration 模式且 mode 决定能用 v2 公式）
-- `/cheat-score` 和 `/cheat-predict` → 读 `rubric_notes.md` 拿当前公式
-- `/cheat-bump` → 这份 starter 是 bump 的"先验起点"，bump 后被替换为用户自己拟合的版本
+- `/initialize` cold-start 模式 → 默认复制本文件到 `rubric_notes.md`（如选择 calibration 模式且 mode 决定能用 v2 公式）
+- `/score` 和 `/predict` → 读 `rubric_notes.md` 拿当前公式
+- `/calibrate` → 这份 starter 是 bump 的"先验起点"，bump 后被替换为用户自己拟合的版本

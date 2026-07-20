@@ -1,6 +1,6 @@
 # Cadence Protocol（节奏协议）
 
-被这些子 skill 引用：`cheat-status`、`cheat-recommend`、`cheat-shoot`、`cheat-publish`、SessionStart hook。
+被这些子 skill 引用：`status`、`recommend`、`shoot`、`publish`、SessionStart hook。
 
 固化"哪天该做什么"——避免用户驱动每一步。让 Claude 在会话开场就能回答"我现在该拍 / 该发 / 该复盘"。
 
@@ -21,11 +21,11 @@
 ### 事件级（T+`RETRO_WINDOW_DAYS` 天到期）
 
 - 任何已发未复盘 + 时间到 → SessionStart 顶部高亮
-- 用户给数据（粘 / URL）→ `/cheat-retro` 自动跑
+- 用户给数据（粘 / URL）→ `/retro` 自动跑
 
 ### 周级（用户决定的"集中处理日"）
 
-- 抓热点（`/cheat-trends`）刷新候选池
+- 抓热点（`/trends`）刷新候选池
 - 检查 rubric bump 触发条件
 - 清理 STATUS.md / rubric_notes.md 是否需要清算
 
@@ -35,7 +35,7 @@
 
 **Buffer = `state.shoots` 数组长度** = 已拍但未发布的视频数。
 
-`/cheat-shoot` 把视频加进 `state.shoots`，`/cheat-publish` 移除——两个事件分开使 buffer 跟踪准确。
+`/shoot` 把视频加进 `state.shoots`，`/publish` 移除——两个事件分开使 buffer 跟踪准确。
 
 ### 颜色阈值（按 `target_publish_cadence_days` 派生）
 
@@ -55,11 +55,11 @@
 
 ### 灵活节奏（target_publish_cadence_days = null）
 
-用户在 cheat-init 选"灵活/不固定" → buffer 监控**关闭**。SessionStart 报告只显示"已拍未发：N 条"，不显示颜色，不警戒。
+用户在 initialize 选"灵活/不固定" → buffer 监控**关闭**。SessionStart 报告只显示"已拍未发：N 条"，不显示颜色，不警戒。
 
 ---
 
-## 选题策略（`/cheat-recommend` 推 ≥ 2 个时）
+## 选题策略（`/recommend` 推 ≥ 2 个时）
 
 每次推荐 2 条时遵循 **1 稳分 + 1 实验性** 原则：
 
@@ -108,9 +108,9 @@
 
 ```
 SessionStart 报告 → user 决定拍/不拍
-├─ 拍 → "推荐选题" → cheat-recommend 推 2 个 →
-│       user 选 → /cheat-seed 写 draft (cold-start) 或 user 自己写 →
-│       user 改写 → script.md → user 拍 → "拍了 videos/<...>/" → cheat-shoot
+├─ 拍 → "推荐选题" → recommend 推 2 个 →
+│       user 选 → /ideate 写 draft (cold-start) 或 user 自己写 →
+│       user 改写 → script.md → user 拍 → "拍了 videos/<...>/" → shoot
 └─ 不拍 → 等
 ```
 
@@ -118,8 +118,8 @@ SessionStart 报告 → user 决定拍/不拍
 
 ```
 SessionStart 报告含 ⏰ 复盘提醒 → user 给 video URL 或粘数据 →
-cheat-retro 自动跑 → 写复盘段 → 检查 bump 触发条件
-├─ 触发 → 提议 /cheat-bump（不强制，用户决定）
+retro 自动跑 → 写复盘段 → 检查 bump 触发条件
+├─ 触发 → 提议 /calibrate（不强制，用户决定）
 └─ 未触发 → 等下个验证样本
 ```
 
@@ -127,25 +127,25 @@ cheat-retro 自动跑 → 写复盘段 → 检查 bump 触发条件
 
 ```
 🔴 SessionStart 第一行警戒 → user 决定
-├─ 拍 → cheat-recommend 只推 v 当前 top 1 稳分 → 立即拍
-└─ 接受断更风险 → user 自负，cheat-status 持续提示
+├─ 拍 → recommend 只推 v 当前 top 1 稳分 → 立即拍
+└─ 接受断更风险 → user 自负，status 持续提示
 ```
 
 ### 情况 4：buffer 蓝色积压
 
 ```
 🔵 SessionStart 报告"积压" → user 决定
-├─ 发 → "已发布 https://..." → cheat-publish → buffer -1
+├─ 发 → "已发布 https://..." → publish → buffer -1
 ├─ 复盘 → 见情况 2
-└─ 拍新 → cheat-recommend 拒绝："你 buffer 已 N 条，先发掉 ≤3 条再来"
+└─ 拍新 → recommend 拒绝："你 buffer 已 N 条，先发掉 ≤3 条再来"
 ```
 
 ### 情况 5：周期性集中处理日（用户主动触发）
 
 ```
-user 说"抓热点" → cheat-trends → 候选池更新
-+ user 说"看看 rubric 是不是该升了" → cheat-status 检查同向偏差累计
-+ user 说"看看 rubric_notes 行数" → cheat-status 健康度检查
+user 说"抓热点" → trends → 候选池更新
++ user 说"看看 rubric 是不是该升了" → status 检查同向偏差累计
++ user 说"看看 rubric_notes 行数" → status 健康度检查
 ```
 
 ---
@@ -174,21 +174,21 @@ user 说"抓热点" → cheat-trends → 候选池更新
 
 | Skill | 节奏责任 |
 |---|---|
-| `/cheat-init` | 问 cadence；写 `target_publish_cadence_days`；装 SessionStart hook |
-| `/cheat-shoot` | 把 video folder 加 state.shoots，buffer +1 |
-| `/cheat-publish` | 从 state.shoots 移除对应项，buffer -1 |
-| `/cheat-status` | 计算 buffer + 颜色，输出报告 |
-| `/cheat-recommend` | 按 buffer 颜色 + 选题策略给推荐 |
-| `/cheat-retro` | 复盘后更新 STATUS（自动 trigger /cheat-status） |
-| SessionStart hook | 调 /cheat-status 渲染 4-6 行报告，写到 STATUS.md |
+| `/initialize` | 问 cadence；写 `target_publish_cadence_days`；装 SessionStart hook |
+| `/shoot` | 把 video folder 加 state.shoots，buffer +1 |
+| `/publish` | 从 state.shoots 移除对应项，buffer -1 |
+| `/status` | 计算 buffer + 颜色，输出报告 |
+| `/recommend` | 按 buffer 颜色 + 选题策略给推荐 |
+| `/retro` | 复盘后更新 STATUS（自动 trigger /status） |
+| SessionStart hook | 调 /status 渲染 4-6 行报告，写到 STATUS.md |
 
 ---
 
-## 关键差异：cheat-on-content vs 视频分析
+## 关键差异：NextTake Content Engine vs 视频分析
 
-| 维度 | 视频分析 | cheat-on-content |
+| 维度 | 视频分析 | NextTake Content Engine |
 |---|---|---|
-| Cadence 来源 | 默认日更（CADENCE.md 硬编码） | 用户自填（cheat-init 问，4 档：日/隔日/周/灵活） |
+| Cadence 来源 | 默认日更（CADENCE.md 硬编码） | 用户自填（initialize 问，4 档：日/隔日/周/灵活） |
 | Buffer 阈值 | 0/1/2/3-5/6+（按"篇"）| 0/1-2/3-5/>5（按"buffer_days"——按用户 cadence 派生） |
 | 推荐 2 条策略 | 1 稳 + 1 实验 | 同 |
 | SessionStart 报告 | CLAUDE.md 文字约束 + Claude 自觉 | hook 强制 + Claude 读 hook 输出 |

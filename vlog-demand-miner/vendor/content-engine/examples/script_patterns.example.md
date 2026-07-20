@@ -141,7 +141,7 @@
 
 - **写作形态（draft-v0.md / script.md）**：完整段落
 - **字幕形态（视频拍完）**：剪映自动断成 5-15 字 / 行
-- cheat-seed 写 draft 时**只输出段落版**
+- ideate 写 draft 时**只输出段落版**
 
 **段落内的句子节奏**：
 - **短句为主**——避免复合句、避免"其..."、"以..."这种文言连接
@@ -181,13 +181,13 @@
 - 2:52（71w）
 - 3:00（124w）
 
-**不要超过 3:30**（在 v2 起点的 NA=4 权重下）。**你的账号可能不同**——按 cheat-init 配的 typical_duration_seconds 调。
+**不要超过 3:30**（在 v2 起点的 NA=4 权重下）。**你的账号可能不同**——按 initialize 配的 typical_duration_seconds 调。
 
 ---
 
-## 用户改稿历史观察（**持续追加，cheat-retro 复盘后建议补充**）
+## 用户改稿历史观察（**持续追加，retro 复盘后建议补充**）
 
-> 每次复盘发现"用户改了 X，流量出现明显 Y 影响"时，cheat-retro 会建议在这里追加一行。
+> 每次复盘发现"用户改了 X，流量出现明显 Y 影响"时，retro 会建议在这里追加一行。
 
 | 视频 | 用户砍掉了什么 | 用户加了什么 | 流量影响 |
 |---|---|---|---|
@@ -203,7 +203,7 @@
 
 ## 新发现的 Pattern（编号续）
 
-> cheat-retro 复盘时发现新现象（用户改稿带来明显流量变化、评论区出现新模式），会建议追加新 pattern。
+> retro 复盘时发现新现象（用户改稿带来明显流量变化、评论区出现新模式），会建议追加新 pattern。
 
 ### Pattern 11（示例）：评论区互动钩子（来自参考博主"哈哈长度"）
 
@@ -229,7 +229,7 @@
 
 ## 维护建议
 
-- **保持 < 500 行**——每次复盘后追加新 pattern，但也定期删除被推翻的旧 pattern（与 rubric_notes.md 同 lifecycle 协议——见 [observation-lifecycle.md](../cheat-on-content/shared-references/observation-lifecycle.md)）
+- **保持 < 500 行**——每次复盘后追加新 pattern，但也定期删除被推翻的旧 pattern（与 rubric_notes.md 同 lifecycle 协议——见 [observation-lifecycle.md](../shared-references/observation-lifecycle.md)）
 - **第 5 次复盘后**：把上面所有"示例"标的 pattern **完整改写**为你账号的实测——示例只是给你看格式，不是真理
 - **新 pattern 必须有 ≥1 样本支持**——单点观察先放到底部"待验证"段，≥2 才升正式 pattern
 - 每个 pattern **必须可追溯到具体视频** + 数据（不写"开头钩子很重要"，写"参考博主停止期待用 IS 戏仿开场，T+7d 71w"）

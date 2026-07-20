@@ -1,6 +1,6 @@
 # Candidate Schema（候选项统一 schema）
 
-被这些子 skill 引用：`cheat-trends`、`cheat-recommend`、`cheat-init`、所有 `adapters/`。
+被这些子 skill 引用：`trends`、`recommend`、`initialize`、所有 `adapters/`。
 
 任何"待决定要不要做"的内容素材——不管来自手粘列表 / RSS / Notion / 平台热点抓取——都必须 normalize 成本 schema 之后才进入候选池。这是 `adapters/` 的输出契约。
 
@@ -81,7 +81,7 @@
 }
 ```
 
-打分前 score 字段全部为 null——是预期的。`cheat-trends` 抓回来后会调 `cheat-score` 给每条算 composite。
+打分前 score 字段全部为 null——是预期的。`trends` 抓回来后会调 `score` 给每条算 composite。
 
 ---
 
@@ -102,7 +102,7 @@
 > [snapshot_text 段，如有]
 ```
 
-升级到 SQLite 之后（见 `cheat-status` 的升级触发），同样字段走 `articles` 表存储，markdown 视图自动从 DB 渲染。
+升级到 SQLite 之后（见 `status` 的升级触发），同样字段走 `articles` 表存储，markdown 视图自动从 DB 渲染。
 
 ---
 
@@ -130,15 +130,15 @@ def candidate_id(source: str, title: str, url: str = None) -> str:
 
 ## 去重协议
 
-`cheat-trends` / `cheat-recommend` 在写入 `candidates.md` 前必须执行：
+`trends` / `recommend` 在写入 `candidates.md` 前必须执行：
 
 1. 计算新 item 的 id
 2. 检查 `candidates.md` 是否已含此 id → 跳过
 3. 检查 `predictions/*.md` 是否含此 id（已发过）→ 跳过
-4. 检查 `.cheat-cache/trends-history.jsonl` 是否含此 id 且 `rejected_at != null` → 跳过（用户已主动拒绝过）
+4. 检查 `.nexttake-cache/trends-history.jsonl` 是否含此 id 且 `rejected_at != null` → 跳过（用户已主动拒绝过）
 5. 通过则写入
 
-`.cheat-cache/trends-history.jsonl` 是抓取历史的去重缓存，每行一个 JSON record，append-only。被用户拒绝的候选会在这里保留 6 个月；之后允许重新出现（也许素材在新 rubric 下评估不同）。
+`.nexttake-cache/trends-history.jsonl` 是抓取历史的去重缓存，每行一个 JSON record，append-only。被用户拒绝的候选会在这里保留 6 个月；之后允许重新出现（也许素材在新 rubric 下评估不同）。
 
 ---
 
@@ -146,14 +146,14 @@ def candidate_id(source: str, title: str, url: str = None) -> str:
 
 | Tier | 含义 | 对应行动 |
 |---|---|---|
-| `tier1` | 强候选，应推荐 | 进入 `cheat-recommend` 排序池 |
+| `tier1` | 强候选，应推荐 | 进入 `recommend` 排序池 |
 | `tier2` | 中等，备选 | 进入排序池但权重低 |
 | `tier3` | 弱候选，备而不用 | 不进推荐池，留作长尾 |
 | `skip` | 用户主动跳过 | 不再出现 |
 | `risky` | 议题敏感 / 平台风控风险 | 推荐时额外标注，需用户确认 |
 | `done` | 已发布 | 移出候选池，由 prediction file 接管 |
 
-**Cold-start 期间所有 item 默认是 `unread`/`null tier`**——直到用户或 `cheat-score` 给出 composite 后才能粗分类。**未打分的 item 不应出现在 `cheat-recommend` 输出**——避免推荐没读过的素材。
+**Cold-start 期间所有 item 默认是 `unread`/`null tier`**——直到用户或 `score` 给出 composite 后才能粗分类。**未打分的 item 不应出现在 `recommend` 输出**——避免推荐没读过的素材。
 
 ---
 

@@ -2,7 +2,7 @@
 #
 # whisper adapter wrapper
 #
-# Called by /cheat-learn-from when user provides video file (Way b).
+# Called by /learn-from when user provides video file (Way b).
 # Transcribes video → transcript.md (paragraph format, no timestamps).
 #
 # Usage:
@@ -63,7 +63,7 @@ Install one:
   Option A (recommended, fast): brew install whisper-cpp
   Option B (Python, slower):    pip install openai-whisper
 
-Then re-run /cheat-learn-from.
+Then re-run /learn-from.
 
 See adapters/script-extraction/whisper/README.md for details.
 EOF

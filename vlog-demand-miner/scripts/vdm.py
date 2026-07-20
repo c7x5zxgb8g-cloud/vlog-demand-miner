@@ -47,7 +47,6 @@ DEFAULT_REQUEST_DELAY_MAX_SECONDS = 12.0
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_ENGINE_ROOT = Path(
     os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
-    or os.getenv("VDM_CHEAT_ROOT")
     or str(SKILL_ROOT / "vendor" / "content-engine")
 ).expanduser().resolve()
 VENDORED_DOUYIN_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
@@ -870,12 +869,10 @@ if __name__ == "__main__":
     parser.add_argument("--douyin-provider", choices=["auto", "sidecar", "browser"], default=os.getenv("VDM_DOUYIN_PROVIDER", "auto"))
     parser.add_argument("--douyin-browser-python", default=os.getenv("VDM_DOUYIN_BROWSER_PYTHON", sys.executable))
     parser.add_argument("--douyin-browser-profile-dir", default=os.getenv("VDM_DOUYIN_BROWSER_PROFILE_DIR", "~/.local/share/vlog-demand-miner/browser-profiles/douyin"))
-    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_DIR") or str(VENDORED_DOUYIN_ADAPTER)
-    revision_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_REVISION") or os.getenv("VDM_CHEAT_DOUYIN_ADAPTER_REVISION") or "bundled"
+    adapter_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_DIR") or str(VENDORED_DOUYIN_ADAPTER)
+    revision_default = os.getenv("NEXTTAKE_DOUYIN_ADAPTER_REVISION") or "bundled"
     parser.add_argument("--douyin-adapter-dir", dest="douyin_adapter_dir", default=adapter_default)
     parser.add_argument("--douyin-adapter-revision", dest="douyin_adapter_revision", default=revision_default)
-    parser.add_argument("--cheat-douyin-adapter-dir", dest="douyin_adapter_dir", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
-    parser.add_argument("--cheat-douyin-adapter-revision", dest="douyin_adapter_revision", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
     parser.add_argument("--commenter-hmac-key-env")
     parser.add_argument("--request-delay-min-seconds", default=os.getenv("VDM_REQUEST_DELAY_MIN_SECONDS", str(DEFAULT_REQUEST_DELAY_MIN_SECONDS)))
     parser.add_argument("--request-delay-max-seconds", default=os.getenv("VDM_REQUEST_DELAY_MAX_SECONDS", str(DEFAULT_REQUEST_DELAY_MAX_SECONDS)))
