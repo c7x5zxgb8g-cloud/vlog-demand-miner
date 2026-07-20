@@ -58,6 +58,8 @@ python3 scripts/vdm.py --project /absolute/path/to/research-project \
 
 Treat `blocked_auth`, `blocked_verification`, `risk_control`, and `schema_drift` as a stop condition. Do not retry within the platform; preserve the checkpoint and use the approved Browser Provider or ask the user to refresh the Sidecar login.
 
+The current Sidecar can resolve a user-provided Douyin profile/share URL and collect a known account, but it does not expose keyword account search. Use the Browser Provider for automatic track-based Douyin account discovery. Do not copy Sidecar cookies into the Browser profile.
+
 ### 抖音 Browser Provider (Docker-free fallback)
 
 The installer returns a dedicated Python path. Use it to open an ordinary, persistent browser window and complete login manually:
@@ -69,6 +71,10 @@ After the window closes, verify the runtime and run a small serial sync:
 
     python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser doctor
     python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser sync --creator-id "<creator-id>" --pages 1
+
+After successful manual login, automatic account discovery can use the public content search page:
+
+    python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser creator-discover --track "首次租房" --platform douyin --limit 3
 
 Browser Provider reuses the upstream persistent browser session and passive XHR capture for public-video comments. VDM never copies, exports, prints, or writes Cookie/browser-storage values to projects, artifacts, reports, model inputs, or logs; it does not download media, solve CAPTCHA, or claim complete/random comment coverage. This upstream public-page path does not expose a stable raw user ID, so Browser comments use an HMAC of the available display name and carry `commenter_identity_display_name_based`; missing names remain unidentified. Never treat comment IDs as independent users. When ASR is required, supply a locally obtained media file and use `transcript-import`.
 

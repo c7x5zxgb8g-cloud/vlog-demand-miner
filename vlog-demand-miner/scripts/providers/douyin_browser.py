@@ -22,7 +22,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 try:
     from playwright.async_api import Error as PlaywrightError
@@ -38,6 +38,7 @@ except ImportError:
 
 SCHEMA_VERSION = "1.0.0"
 VIDEO_ID = re.compile(r"/video/(\d+)")
+ACCOUNT_ID = re.compile(r"/user/([^/?#]+)")
 SKILL_ROOT = Path(__file__).resolve().parents[2]
 CONTENT_ENGINE_ROOT = Path(
     os.getenv("NEXTTAKE_CONTENT_ENGINE_ROOT")
@@ -111,6 +112,21 @@ def browser_comment_scrolls(value: Any) -> int:
 def visible_post_id(href: str | None) -> str:
     match = VIDEO_ID.search(href or "")
     return match.group(1) if match else ""
+
+
+def visible_account_id(href: str | None) -> str:
+    match = ACCOUNT_ID.search(href or "")
+    return match.group(1) if match else ""
+
+
+def validate_douyin_url(value: str) -> str:
+    parsed = urlsplit(value.strip())
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (host == "douyin.com" or host.endswith(".douyin.com")):
+        raise ValueError("douyin_account_url_required")
+    if parsed.username or parsed.password:
+        raise ValueError("douyin_account_url_required")
+    return value.strip()
 
 
 @dataclass
@@ -219,6 +235,43 @@ class BrowserProvider:
             pass
         return list(posts.values())
 
+    async def _accounts_from_page(self, page: Any, limit: int) -> list[dict[str, Any]]:
+        links = page.locator('a[href*="/user/"]')
+        accounts: dict[str, dict[str, Any]] = {}
+        try:
+            for index in range(min(await links.count(), 80)):
+                link = links.nth(index)
+                href = await link.get_attribute("href")
+                account_id = visible_account_id(href)
+                if not account_id or account_id in accounts:
+                    continue
+                text = (await link.inner_text()).strip()
+                if not text:
+                    image = link.locator("img").first
+                    text = str(await image.get_attribute("alt") or "").strip()
+                try:
+                    card_text = str(await link.evaluate("el => ((el.closest('li') || el.parentElement || el).innerText || '').trim()"))
+                except PlaywrightError:
+                    card_text = text
+                lines = [line.strip() for line in (text or card_text).splitlines() if line.strip()]
+                name = lines[0] if lines else ""
+                if not name:
+                    continue
+                profile_url = href if str(href or "").startswith("https://") else f"https://www.douyin.com/user/{account_id}"
+                accounts[account_id] = {
+                    "account_id": account_id,
+                    "name": name[:200],
+                    "bio": card_text[:500],
+                    "followers": 0,
+                    "posts": 0,
+                    "profile_url": clean_url(profile_url),
+                }
+                if len(accounts) >= min(max(limit, 1), 20):
+                    break
+        except PlaywrightError:
+            pass
+        return list(accounts.values())
+
     def _comments_from_upstream(self, rows: list[dict[str, Any]], aweme_id: str) -> list[dict[str, Any]]:
         comments: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -255,11 +308,33 @@ class BrowserProvider:
                     "warnings": ["browser_provider_does_not_download_media"]}
         if kind == "fetch_replies":
             return {"op": kind, "status": "unsupported", "warnings": ["browser_visible_reply_collection_not_supported"]}
-        if kind not in {"list_posts", "fetch_post", "fetch_comments"}:
+        if kind not in {"search_accounts", "resolve_account", "list_posts", "fetch_post", "fetch_comments"}:
             return {"op": kind, "status": "unsupported", "warnings": ["unsupported_operation"]}
         page = await self.context.new_page()
         warnings: list[str] = ["browser_visible_partial_coverage"]
         try:
+            if kind == "search_accounts":
+                keyword = str(operation.get("keyword") or "").strip()
+                if not keyword:
+                    return {"op": kind, "status": "invalid_input", "warnings": ["search_keyword_required"]}
+                limit = min(max(positive_int(operation.get("limit"), 10), 1), 20)
+                await self._navigate(page, f"https://www.douyin.com/search/{quote(keyword, safe='')}?type=video", warnings)
+                await self._scroll(page, 1, warnings)
+                candidates = await self._accounts_from_page(page, limit)
+                if not candidates:
+                    warnings.append("no_visible_accounts_detected")
+                    return {"op": kind, "status": "partial", "candidates": [], "coverage": self._coverage(records=0, scrolls=1, warnings=warnings, kind=kind), "warnings": warnings}
+                return {"op": kind, "status": "ok", "candidates": candidates, "coverage": self._coverage(records=len(candidates), scrolls=1, warnings=warnings, kind=kind), "warnings": warnings + ["platform_search_order_bias", "candidate_relevance_requires_review"]}
+            if kind == "resolve_account":
+                source_url = validate_douyin_url(str(operation.get("source_url") or ""))
+                await self._navigate(page, source_url, warnings)
+                account_id = visible_account_id(page.url)
+                if not account_id:
+                    links = page.locator('a[href*="/user/"]')
+                    account_id = visible_account_id(await links.first.get_attribute("href")) if await links.count() else ""
+                if not account_id:
+                    return {"op": kind, "status": "account_not_found", "warnings": warnings}
+                return {"op": kind, "status": "ok", "account_id": account_id, "warnings": warnings}
             if kind == "list_posts":
                 sec_user_id = str(operation.get("sec_user_id") or "")
                 if not sec_user_id:
@@ -298,6 +373,8 @@ class BrowserProvider:
             return {"op": kind, "status": "ok", "comments": comments,
                     "coverage": self._coverage(records=len(comments), scrolls=browser_comment_scrolls(operation.get("max_pages")), warnings=warnings, kind=kind),
                     "warnings": warnings}
+        except ValueError as exc:
+            return {"op": kind, "status": "invalid_input", "warnings": warnings, "error": {"type": str(exc)}}
         except PlaywrightError as exc:
             return {"op": kind, "status": "blocked_browser_page", "warnings": warnings, "error": {"type": type(exc).__name__}}
         finally:
@@ -313,7 +390,7 @@ async def healthcheck(profile_dir: Path, adapter_dir: Path | None) -> dict[str, 
         if not executable.is_file():
             raise PlaywrightError("playwright_browser_runtime_missing")
         return {"runtime": "playwright-persistent-browser",
-                "capabilities": ["list_posts_visible", "fetch_post_visible", "fetch_comments_visible", "manual_login"]}
+                "capabilities": ["search_accounts_visible", "resolve_account_visible", "list_posts_visible", "fetch_post_visible", "fetch_comments_visible", "manual_login"]}
     finally:
         await playwright.stop()
 

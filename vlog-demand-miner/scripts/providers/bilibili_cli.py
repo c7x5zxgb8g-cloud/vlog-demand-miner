@@ -127,7 +127,7 @@ class BilibiliCli:
             raise ProviderFailure("provider_unavailable") from exc
         if completed.returncode != 0:
             raise ProviderFailure("provider_unavailable")
-        return {"runtime": "pinned-bilibili-cli", "capabilities": ["list_posts", "fetch_post", "fetch_comments", "fetch_media"]}
+        return {"runtime": "pinned-bilibili-cli", "capabilities": ["search_creator_signals", "search_accounts", "list_posts", "fetch_post", "fetch_comments", "fetch_media"]}
 
     def list_posts(self, uid: str, max_pages: int, page_size: int) -> dict[str, Any]:
         if max_pages != 1:
@@ -143,6 +143,68 @@ class BilibiliCli:
             "requested_limit": limit, "records_seen": len(data), "records_unique": len({post["post_id"] for post in posts}),
             "complete": False, "next_cursor": None, "stopped_reason": "provider_latest_limit_no_cursor",
         }, "warnings": ["inventory_publish_time_unavailable"]}
+
+    def search_accounts(self, keyword: str, page: int, limit: int) -> dict[str, Any]:
+        if page != 1:
+            raise ProviderFailure("safe_page_limit_exceeded")
+        keyword = keyword.strip()
+        if not keyword:
+            raise ProviderFailure("invalid_input")
+        count = min(max(limit, 1), 20)
+        data = self._run(["search", keyword, "--type", "user", "--page", "1", "--max", str(count)])
+        if not isinstance(data, list):
+            raise ProviderFailure("schema_drift")
+        candidates = []
+        for raw in data[:count]:
+            if not isinstance(raw, dict):
+                continue
+            account_id = str(raw.get("id") or "")
+            name = str(raw.get("name") or "").strip()
+            if account_id and name:
+                candidates.append({
+                    "account_id": account_id,
+                    "name": name[:200],
+                    "bio": str(raw.get("sign") or "")[:500],
+                    "followers": as_int(raw.get("fans")),
+                    "posts": as_int(raw.get("videos")),
+                    "profile_url": f"https://space.bilibili.com/{account_id}",
+                })
+        return {
+            "status": "ok",
+            "candidates": candidates,
+            "coverage": {"page": 1, "records_seen": len(data), "records_returned": len(candidates), "complete": False, "stopped_reason": "single_search_page_limit"},
+            "warnings": ["platform_search_order_bias", "candidate_relevance_requires_review"],
+        }
+
+    def search_creator_signals(self, keyword: str, page: int, limit: int) -> dict[str, Any]:
+        if page != 1:
+            raise ProviderFailure("safe_page_limit_exceeded")
+        keyword = keyword.strip()
+        if not keyword:
+            raise ProviderFailure("invalid_input")
+        count = min(max(limit, 1), 20)
+        data = self._run(["search", keyword, "--type", "video", "--page", "1", "--max", str(count)])
+        if not isinstance(data, list):
+            raise ProviderFailure("schema_drift")
+        creators: dict[str, dict[str, Any]] = {}
+        for raw in data[:count]:
+            if not isinstance(raw, dict):
+                continue
+            name = str(raw.get("author") or "").strip()
+            title = str(raw.get("title") or "").strip()
+            if not name or not title:
+                continue
+            signal = creators.setdefault(name, {"name": name[:200], "evidence_titles": [], "plays": 0})
+            if title[:500] not in signal["evidence_titles"]:
+                signal["evidence_titles"].append(title[:500])
+            signal["plays"] = max(signal["plays"], as_int(raw.get("play")))
+        return {
+            "status": "ok",
+            "keyword": keyword,
+            "creators": list(creators.values()),
+            "coverage": {"page": 1, "records_seen": len(data), "creator_names": len(creators), "complete": False, "stopped_reason": "single_search_page_limit"},
+            "warnings": ["content_search_order_bias", "creator_identity_requires_resolution"],
+        }
 
     def fetch_post(self, bvid: str) -> dict[str, Any]:
         data = self._run(["video", bvid, "--subtitle-timeline", "--comments"])
@@ -188,6 +250,8 @@ class BilibiliCli:
         try:
             kind = operation.get("op")
             if kind == "healthcheck": return {"status": "ok", "health": self.healthcheck()}
+            if kind == "search_creator_signals": return self.search_creator_signals(str(operation.get("keyword") or ""), as_int(operation.get("page") or 1), as_int(operation.get("limit") or 10))
+            if kind == "search_accounts": return self.search_accounts(str(operation.get("keyword") or ""), as_int(operation.get("page") or 1), as_int(operation.get("limit") or 10))
             if kind == "list_posts": return self.list_posts(str(operation.get("uid") or ""), as_int(operation.get("max_pages") or 1), as_int(operation.get("page_size") or 20))
             if kind == "fetch_post": return self.fetch_post(str(operation.get("bvid") or ""))
             if kind == "fetch_comments": return self.fetch_comments(str(operation.get("bvid") or ""))
