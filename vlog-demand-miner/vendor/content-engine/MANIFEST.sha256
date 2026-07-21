@@ -4,7 +4,7 @@ f6deab347713e6a75c96da474de49357d58b2dc9abbf7928a02baedb87e34c0b  ./CHANGELOG.md
 9b69b736cb48fbc8704bf0d71835ac57d12bc0434cca402c53efd774f4760f0f  ./ENGINE.md
 f50148c04443b36bdca533063631991086547af0984d692fbed247cb57e154cc  ./LICENSE
 8962e77d656d8bed22e09a428fbdbc86e6e1bf3bb05edabe3e6796153d7532c3  ./README.md
-721b61512c3a1054fc2d610ccc4afc539c3c31952157558bc3315462a6bb7384  ./UPSTREAM.md
+3372c4a6300d8f62f1b6c5886ca7e15614f8ff7e0bf226f03e4d3c9391e74ce2  ./UPSTREAM.md
 ad83196a57e0c674efddfa0711adacef647a4f181a528898798f7e81edcab483  ./adapters/perf-data/bilibili-stat/.gitattributes
 c2e06a4660b2c33585d1e0113698f10061dca355e6b247f301b3345328d8ac3c  ./adapters/perf-data/bilibili-stat/README.md
 e425b5f7c25de9b776fbd0d44b9217c408aeac765924721513814a1348585530  ./adapters/perf-data/bilibili-stat/crawler.py
@@ -14,7 +14,7 @@ cd6969d452179c55068c7e2cd90a48be7ad8af950a8ab057f527576d468b371b  ./adapters/per
 56bba0bb927044e35e3e4152523d07b712bcf482373aecfa8e0153a21bae80ad  ./adapters/perf-data/bilibili-stat/review.py
 f1bc1604185c4e17221943d9adaf4a7beac9182a03510ef6a2a770beee5c41fc  ./adapters/perf-data/bilibili-stat/run.sh
 21f8011367bbdeeea38a01dc058a650f0ef56a6b7aa33d0d9ecf5ce3de17dba6  ./adapters/perf-data/douyin-session/README.md
-e76a0e0f1af6773f7f81f143f8538081f548f684c70e4dbb1dd665da4e8c4988  ./adapters/perf-data/douyin-session/crawler.py
+030f6cb6dc66a20d1551d4525b867bbd72a154f438faf7a56e24ebc4eab394fa  ./adapters/perf-data/douyin-session/crawler.py
 23d2ccc6e165e8cd1feba8e9771c92c2819cb1db7c1fafba004ea6315bb50485  ./adapters/perf-data/douyin-session/paths.py
 2efcbae137474edd86f75cf2005a8531851f50007635b1d857c55d5c1e99c1f5  ./adapters/perf-data/douyin-session/renderer.py
 e0bdf5ddf23c7ba90da192c9c22293895d039509a7d54742d705225f45dc8367  ./adapters/perf-data/douyin-session/requirements.txt

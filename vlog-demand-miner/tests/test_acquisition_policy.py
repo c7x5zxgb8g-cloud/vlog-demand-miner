@@ -24,6 +24,9 @@ def args(**overrides):
         "bilibili_cli": "/tmp/bili",
         "commenter_hmac_key_env": None,
         "douyin_provider": "auto",
+        "douyin_browser_python": sys.executable,
+        "douyin_browser_profile_dir": "/tmp/vdm-browser-profile",
+        "douyin_adapter_dir": "/tmp/douyin-adapter",
         "douyin_adapter_revision": "test",
         "request_delay_min_seconds": 6,
         "request_delay_max_seconds": 12,
@@ -110,6 +113,35 @@ class AcquisitionPolicyTests(unittest.TestCase):
             )
         self.assertEqual(result["status"], "ok")
         self.assertEqual(seen, ["fetch_post", "fetch_comments"])
+
+    def test_douyin_browser_operations_share_one_provider_plan(self) -> None:
+        seen_plans: list[dict] = []
+
+        def fake_invoke(_command, plan):
+            payload = json.loads(plan.read_text(encoding="utf-8"))
+            seen_plans.append(payload)
+            return {
+                "status": "ok",
+                "data": {"operations": [
+                    {"op": operation["op"], "status": "ok"}
+                    for operation in payload["operations"]
+                ]},
+                "warnings": [],
+            }
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(vdm, "invoke_provider", side_effect=fake_invoke):
+            project = Path(directory)
+            vdm.connect(project).close()
+            result = vdm.run_provider(
+                project,
+                "douyin",
+                args(douyin_provider="browser"),
+                [{"op": "fetch_post", "aweme_id": "1"}, {"op": "fetch_comments", "aweme_id": "1"}],
+            )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(seen_plans), 1)
+        self.assertEqual([item["op"] for item in seen_plans[0]["operations"]], ["fetch_post", "fetch_comments"])
+        self.assertEqual(seen_plans[0]["operation_delay_seconds"], {"min": 6, "max": 12})
 
     def test_policy_is_part_of_sync_task_identity(self) -> None:
         provider_response = {

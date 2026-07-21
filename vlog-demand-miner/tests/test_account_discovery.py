@@ -30,6 +30,7 @@ def args(**overrides):
         "commenter_hmac_key_env": None,
         "douyin_provider": "auto",
         "douyin_adapter_revision": "test",
+        "enable_experimental_douyin_discovery": False,
         "request_delay_min_seconds": 0,
         "request_delay_max_seconds": 0,
     }
@@ -51,6 +52,16 @@ class AccountDiscoveryTests(unittest.TestCase):
         ranked = vdm.rank_creator_signals([*repeated, unique])
         self.assertEqual(ranked[0]["name"], "持续创作者")
 
+    def test_default_automatic_discovery_only_selects_bilibili(self) -> None:
+        response = {"status": "ok", "data": {"operations": []}, "warnings": []}
+        with tempfile.TemporaryDirectory() as directory, patch.object(vdm, "run_provider", return_value=response) as provider:
+            project = Path(directory)
+            db = vdm.connect(project)
+            result = vdm.do_creator_discover(project, db, "首次租房", None, None, 1, args())
+            db.close()
+        self.assertEqual([item["platform"] for item in result["platforms"]], ["bilibili"])
+        self.assertTrue(all(call.args[1] == "bilibili" for call in provider.call_args_list))
+
     def test_automatic_discovery_adds_top_account_per_platform_and_reuses(self) -> None:
         def fake_provider(_project, platform, _args, operations):
             results = []
@@ -71,8 +82,9 @@ class AccountDiscoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(vdm, "run_provider", side_effect=fake_provider) as provider:
             project = Path(directory)
             db = vdm.connect(project)
-            first = vdm.do_creator_discover(project, db, "首次租房", ["bilibili", "douyin"], None, 1, args())
-            second = vdm.do_creator_discover(project, db, "首次租房", ["bilibili", "douyin"], None, 1, args())
+            discover_args = args(enable_experimental_douyin_discovery=True)
+            first = vdm.do_creator_discover(project, db, "首次租房", ["bilibili", "douyin"], None, 1, discover_args)
+            second = vdm.do_creator_discover(project, db, "首次租房", ["bilibili", "douyin"], None, 1, discover_args)
             accounts = db.execute("SELECT platform,platform_account_id FROM accounts ORDER BY platform").fetchall()
             task_inputs = [json.loads(row[0]) for row in db.execute("SELECT input_json FROM tasks WHERE kind='account-discover' ORDER BY entity_id").fetchall()]
             db.close()
@@ -82,6 +94,21 @@ class AccountDiscoveryTests(unittest.TestCase):
         self.assertEqual([(row[0], row[1]) for row in accounts], [("bilibili", "100"), ("douyin", "d-1")])
         self.assertTrue(all(item["acquisition_policy"]["execution"] == "serial" for item in task_inputs))
         self.assertIn("not evidence of demand", first["notice"])
+
+    def test_douyin_automatic_discovery_requires_explicit_experimental_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch.object(vdm, "run_provider") as provider:
+            project = Path(directory)
+            db = vdm.connect(project)
+            result = vdm.do_creator_discover(project, db, "首次租房", ["douyin"], None, 1, args())
+            account_count = db.execute("SELECT count(*) FROM accounts").fetchone()[0]
+            task_count = db.execute("SELECT count(*) FROM tasks WHERE kind='account-discover'").fetchone()[0]
+            db.close()
+        self.assertEqual(result["status"], "manual_input_required")
+        self.assertEqual(result["platforms"][0]["next_action"], "import_benchmark_account")
+        self.assertIn("profile_url", result["platforms"][0]["accepted_inputs"])
+        self.assertEqual(account_count, 0)
+        self.assertEqual(task_count, 0)
+        provider.assert_not_called()
 
     def test_manual_bilibili_profile_url_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

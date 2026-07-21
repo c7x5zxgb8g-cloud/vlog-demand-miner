@@ -111,7 +111,7 @@ python3 scripts/vdm.py --project <research-project> creator-studio \
 需要真实同赛道研究时使用现有流程：
 
 ```text
-init -> creator-discover（自动）或 creator-add（用户提供）
+init -> creator-discover（B站自动；抖音仅显式实验）或 creator-add（抖音默认）
 -> sync -> sample -> acquire
 -> transcript-import (optional)
 -> prepare-analysis -> model-job-input -> submit-evidence
@@ -122,8 +122,10 @@ init -> creator-discover（自动）或 creator-add（用户提供）
 
 - Provider 采集和模型 Evidence 提取分离；
 - 自动账号发现最多使用 3 个关键词、每个平台只查第 1 页，并只登记 `1-5` 个候选；
-- B站自动发现复用本地 CLI；抖音自动发现使用人工登录的公开 Browser Provider，Sidecar负责用户分享链接解析和后续采集；
+- B站自动发现复用本地 CLI；抖音默认要求用户提供账号 ID、主页 URL 或分享 URL，再统一进入受控采集链路；
+- 抖音关键词 Browser 发现是显式开启的实验能力，不得作为默认路径或在风控后自动重试；
 - 真实 Provider 操作默认串行，并在操作之间使用项目级 `6-12` 秒随机缓冲；
+- 同一抖音采集任务复用一个持久浏览器会话；同一视频的公开信息和评论只导航一次；
 - B站每次只同步一个账号且只允许 `sync --pages 1`，其他账号必须在前一命令结束后单独同步；
 - 转录与评论 ModelJob 通道隔离；
 - `quote_snippet` 必须是白名单来源的逐字子串；

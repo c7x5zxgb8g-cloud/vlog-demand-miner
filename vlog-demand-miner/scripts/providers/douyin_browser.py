@@ -14,9 +14,12 @@ import contextlib
 import hashlib
 import hmac
 import importlib.util
+import inspect
 import json
 import io
+import math
 import os
+import random
 import re
 import sys
 from dataclasses import dataclass
@@ -45,9 +48,18 @@ CONTENT_ENGINE_ROOT = Path(
     or str(SKILL_ROOT / "vendor" / "content-engine")
 ).expanduser().resolve()
 DEFAULT_UPSTREAM_ADAPTER = CONTENT_ENGINE_ROOT / "adapters" / "perf-data" / "douyin-session"
+BROWSER_STOP_STATUSES = {
+    "blocked_auth", "blocked_verification", "risk_control",
+    "schema_drift", "anomalous_empty_result", "blocked_browser_page",
+}
+EXPECTED_EMPTY_COMMENT_MARKERS = ("暂无评论", "还没有评论", "暂时没有评论")
 
 
 class UpstreamAdapterUnavailable(RuntimeError):
+    pass
+
+
+class UpstreamAdapterIncompatible(RuntimeError):
     pass
 
 
@@ -109,6 +121,82 @@ def browser_comment_scrolls(value: Any) -> int:
     return min(max(positive_int(value, 1), 6), 20)
 
 
+def classify_blocked_page(url: str, body_text: str) -> str | None:
+    """Classify a visible platform stop page without reading browser storage."""
+    parsed = urlsplit(url or "")
+    host = (parsed.hostname or "").casefold()
+    path = (parsed.path or "").casefold()
+    text = " ".join((body_text or "").split()).casefold()
+    verification_markers = (
+        "安全验证", "请完成下列验证", "完成验证", "滑块验证", "验证码",
+    )
+    risk_markers = (
+        "访问过于频繁", "访问频繁", "请求过于频繁", "操作频繁",
+        "异常访问", "网络环境存在风险", "存在风险", "系统繁忙", "稍后再试",
+    )
+    auth_markers = ("扫码登录", "请先登录", "登录后继续", "登录已失效", "重新登录")
+    if any(value in host or value in path for value in ("captcha", "challenge", "verify")):
+        return "blocked_verification"
+    if any(marker.casefold() in text for marker in verification_markers):
+        return "blocked_verification"
+    if any(marker.casefold() in text for marker in risk_markers):
+        return "risk_control"
+    if host.startswith("sso.") or host.startswith("passport.") or path.startswith("/login"):
+        return "blocked_auth"
+    if any(marker.casefold() in text for marker in auth_markers):
+        return "blocked_auth"
+    return None
+
+
+def operation_delay_bounds(plan: dict[str, Any]) -> tuple[float, float]:
+    raw = plan.get("operation_delay_seconds")
+    if not isinstance(raw, dict):
+        return 0.0, 0.0
+    try:
+        minimum = float(raw.get("min", 0))
+        maximum = float(raw.get("max", minimum))
+    except (TypeError, ValueError):
+        return 0.0, 0.0
+    if not math.isfinite(minimum) or not math.isfinite(maximum) or minimum < 0 or maximum < minimum:
+        return 0.0, 0.0
+    return minimum, maximum
+
+
+def can_combine_post_and_comments(first: dict[str, Any], second: dict[str, Any]) -> bool:
+    return (
+        first.get("op") == "fetch_post"
+        and second.get("op") == "fetch_comments"
+        and bool(str(first.get("aweme_id") or ""))
+        and str(first.get("aweme_id")) == str(second.get("aweme_id"))
+    )
+
+
+async def execute_operations(
+    provider: Any,
+    operations: list[dict[str, Any]],
+    delay_bounds: tuple[float, float],
+) -> list[dict[str, Any]]:
+    """Execute a Browser plan in one context and stop at platform checkpoints."""
+    results: list[dict[str, Any]] = []
+    index = 0
+    acquisition_index = 0
+    while index < len(operations):
+        if acquisition_index:
+            await asyncio.sleep(random.uniform(*delay_bounds))
+        operation = operations[index]
+        if index + 1 < len(operations) and can_combine_post_and_comments(operation, operations[index + 1]):
+            current = await provider.fetch_post_and_comments(operation, operations[index + 1])
+            index += 2
+        else:
+            current = [await provider.action(operation)]
+            index += 1
+        results.extend(current)
+        acquisition_index += 1
+        if any(item.get("status") in BROWSER_STOP_STATUSES for item in current):
+            break
+    return results
+
+
 def visible_post_id(href: str | None) -> str:
     match = VIDEO_ID.search(href or "")
     return match.group(1) if match else ""
@@ -144,6 +232,11 @@ class BrowserProvider:
         try:
             self.adapter_dir = upstream_adapter_dir(self.upstream_adapter_dir)
             self.crawler = load_upstream_crawler(self.adapter_dir)
+            comment_parameters = inspect.signature(self.crawler.fetch_comments).parameters
+            self.supports_page_reuse = (
+                all(name in comment_parameters for name in ("page", "page_guard"))
+                and hasattr(self.crawler, "PageCheckpoint")
+            )
             self.playwright = await async_playwright().start()
             # This is the exact persistent profile location expected by the
             # upstream NextTake Content Engine douyin-session adapter.
@@ -195,7 +288,7 @@ class BrowserProvider:
         except PlaywrightError:
             return
 
-    async def _navigate(self, page: Any, url: str, warnings: list[str]) -> None:
+    async def _navigate(self, page: Any, url: str, warnings: list[str]) -> str | None:
         try:
             await page.goto(url, wait_until="commit", timeout=25_000)
         except PlaywrightTimeoutError:
@@ -203,6 +296,7 @@ class BrowserProvider:
         except PlaywrightError as exc:
             warnings.append(f"navigation_error:{type(exc).__name__}")
         await page.wait_for_timeout(3_000)
+        return await self._page_block_status(page)
 
     async def _scroll(self, page: Any, count: int, warnings: list[str]) -> None:
         for _ in range(min(max(count, 0), 8)):
@@ -218,6 +312,122 @@ class BrowserProvider:
             return await page.locator("body").inner_text(timeout=8_000)
         except PlaywrightError:
             return ""
+
+    async def _page_block_status(self, page: Any) -> str | None:
+        return classify_blocked_page(str(getattr(page, "url", "") or ""), await self._body_text(page))
+
+    def _blocked_result(self, kind: str, status: str, warnings: list[str]) -> dict[str, Any]:
+        return {
+            "op": kind,
+            "status": status,
+            "warnings": warnings + ["browser_checkpoint_preserved", "manual_resume_required"],
+            "recovery": {"action": "complete_platform_checkpoint_then_resume"},
+        }
+
+    async def _post_result(self, page: Any, aweme_id: str, warnings: list[str]) -> dict[str, Any]:
+        title = ""
+        try:
+            title = (await page.locator("h1").first.inner_text(timeout=2_000)).strip()[:500]
+        except PlaywrightError:
+            pass
+        return {
+            "op": "fetch_post",
+            "status": "ok",
+            "post": {"post_id": aweme_id, "title": title, "content_type": "video", "published_at": None, "public_metrics": {}},
+            "subtitles": {"available": False, "items": []},
+            "coverage": self._coverage(records=1, scrolls=0, warnings=warnings, kind="fetch_post"),
+            "warnings": warnings + ["subtitle_unavailable_browser_provider"],
+        }
+
+    async def _comments_result(
+        self,
+        page: Any,
+        aweme_id: str,
+        operation: dict[str, Any],
+        warnings: list[str],
+    ) -> dict[str, Any]:
+        if not self.supports_page_reuse:
+            return {
+                "op": "fetch_comments",
+                "status": "schema_drift",
+                "warnings": warnings + ["douyin_adapter_page_reuse_required"],
+                "recovery": {"action": "install_compatible_douyin_adapter"},
+            }
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                raw_comments = await self.crawler.fetch_comments(
+                    self.upstream_session,
+                    aweme_id,
+                    max_pages=browser_comment_scrolls(operation.get("max_pages")),
+                    page=page,
+                    navigate=True,
+                    page_guard=self._page_block_status,
+                )
+        except self.crawler.PageCheckpoint as checkpoint:
+            return self._blocked_result("fetch_comments", checkpoint.status, warnings)
+        blocked = await self._page_block_status(page)
+        if blocked:
+            return self._blocked_result("fetch_comments", blocked, warnings)
+        comments = self._comments_from_upstream(raw_comments, aweme_id)
+        if self.commenter_secret:
+            warnings.append("commenter_identity_display_name_based")
+        else:
+            warnings.append("commenter_identity_unavailable")
+        if not comments:
+            body = await self._body_text(page)
+            warnings.append("no_browser_captured_comments_detected")
+            if not any(marker in body for marker in EXPECTED_EMPTY_COMMENT_MARKERS):
+                return {
+                    "op": "fetch_comments",
+                    "status": "anomalous_empty_result",
+                    "comments": [],
+                    "coverage": self._coverage(records=0, scrolls=browser_comment_scrolls(operation.get("max_pages")), warnings=warnings, kind="fetch_comments"),
+                    "warnings": warnings + ["browser_checkpoint_preserved", "manual_review_required"],
+                    "recovery": {"action": "review_visible_page_then_resume"},
+                }
+        return {
+            "op": "fetch_comments",
+            "status": "ok",
+            "comments": comments,
+            "coverage": self._coverage(records=len(comments), scrolls=browser_comment_scrolls(operation.get("max_pages")), warnings=warnings, kind="fetch_comments"),
+            "warnings": warnings,
+        }
+
+    async def fetch_post_and_comments(
+        self,
+        post_operation: dict[str, Any],
+        comment_operation: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        aweme_id = str(post_operation.get("aweme_id") or "")
+        if not aweme_id:
+            invalid = {"status": "invalid_input", "warnings": ["aweme_id_required"]}
+            return [{"op": "fetch_post", **invalid}, {"op": "fetch_comments", **invalid}]
+        page = await self.context.new_page()
+        warnings: list[str] = ["browser_visible_partial_coverage", "single_navigation_reused"]
+        try:
+            comments = await self._comments_result(page, aweme_id, comment_operation, list(warnings))
+            if comments.get("status") == "schema_drift":
+                return [
+                    {
+                        "op": "fetch_post",
+                        "status": "schema_drift",
+                        "warnings": list(comments.get("warnings") or []),
+                        "recovery": comments.get("recovery"),
+                    },
+                    comments,
+                ]
+            if comments.get("status") in {"blocked_auth", "blocked_verification", "risk_control", "blocked_browser_page"}:
+                return [
+                    self._blocked_result("fetch_post", str(comments["status"]), warnings),
+                    comments,
+                ]
+            post = await self._post_result(page, aweme_id, list(warnings))
+            return [post, comments]
+        except PlaywrightError as exc:
+            blocked = {"status": "blocked_browser_page", "warnings": warnings, "error": {"type": type(exc).__name__}}
+            return [{"op": "fetch_post", **blocked}, {"op": "fetch_comments", **blocked}]
+        finally:
+            await page.close()
 
     async def _posts_from_page(self, page: Any) -> list[dict[str, Any]]:
         links = page.locator('a[href*="/video/"]')
@@ -318,16 +528,27 @@ class BrowserProvider:
                 if not keyword:
                     return {"op": kind, "status": "invalid_input", "warnings": ["search_keyword_required"]}
                 limit = min(max(positive_int(operation.get("limit"), 10), 1), 20)
-                await self._navigate(page, f"https://www.douyin.com/search/{quote(keyword, safe='')}?type=video", warnings)
+                blocked = await self._navigate(page, f"https://www.douyin.com/search/{quote(keyword, safe='')}?type=video", warnings)
+                if blocked:
+                    return self._blocked_result(kind, blocked, warnings)
                 await self._scroll(page, 1, warnings)
+                blocked = await self._page_block_status(page)
+                if blocked:
+                    return self._blocked_result(kind, blocked, warnings)
                 candidates = await self._accounts_from_page(page, limit)
                 if not candidates:
                     warnings.append("no_visible_accounts_detected")
-                    return {"op": kind, "status": "partial", "candidates": [], "coverage": self._coverage(records=0, scrolls=1, warnings=warnings, kind=kind), "warnings": warnings}
+                    body = await self._body_text(page)
+                    expected_empty = any(marker in body for marker in ("未找到相关", "暂无搜索结果", "没有找到"))
+                    if not expected_empty:
+                        warnings += ["browser_checkpoint_preserved", "manual_review_required"]
+                    return {"op": kind, "status": "partial" if expected_empty else "anomalous_empty_result", "candidates": [], "coverage": self._coverage(records=0, scrolls=1, warnings=warnings, kind=kind), "warnings": warnings, **({"recovery": {"action": "review_visible_page_then_resume"}} if not expected_empty else {})}
                 return {"op": kind, "status": "ok", "candidates": candidates, "coverage": self._coverage(records=len(candidates), scrolls=1, warnings=warnings, kind=kind), "warnings": warnings + ["platform_search_order_bias", "candidate_relevance_requires_review"]}
             if kind == "resolve_account":
                 source_url = validate_douyin_url(str(operation.get("source_url") or ""))
-                await self._navigate(page, source_url, warnings)
+                blocked = await self._navigate(page, source_url, warnings)
+                if blocked:
+                    return self._blocked_result(kind, blocked, warnings)
                 account_id = visible_account_id(page.url)
                 if not account_id:
                     links = page.locator('a[href*="/user/"]')
@@ -339,40 +560,31 @@ class BrowserProvider:
                 sec_user_id = str(operation.get("sec_user_id") or "")
                 if not sec_user_id:
                     return {"op": kind, "status": "invalid_input", "warnings": ["sec_user_id_required"]}
-                await self._navigate(page, f"https://www.douyin.com/user/{sec_user_id}", warnings)
+                blocked = await self._navigate(page, f"https://www.douyin.com/user/{sec_user_id}", warnings)
+                if blocked:
+                    return self._blocked_result(kind, blocked, warnings)
                 await self._scroll(page, positive_int(operation.get("max_pages"), 1), warnings)
+                blocked = await self._page_block_status(page)
+                if blocked:
+                    return self._blocked_result(kind, blocked, warnings)
                 posts = await self._posts_from_page(page)
                 if not posts:
                     warnings.append("no_visible_posts_detected")
-                    return {"op": kind, "status": "partial", "posts": [], "coverage": self._coverage(records=0, scrolls=positive_int(operation.get("max_pages"), 1), warnings=warnings, kind=kind), "warnings": warnings}
+                    body = await self._body_text(page)
+                    expected_empty = any(marker in body for marker in ("暂无作品", "还没有作品", "暂时没有作品"))
+                    if not expected_empty:
+                        warnings += ["browser_checkpoint_preserved", "manual_review_required"]
+                    return {"op": kind, "status": "partial" if expected_empty else "anomalous_empty_result", "posts": [], "coverage": self._coverage(records=0, scrolls=positive_int(operation.get("max_pages"), 1), warnings=warnings, kind=kind), "warnings": warnings, **({"recovery": {"action": "review_visible_page_then_resume"}} if not expected_empty else {})}
                 return {"op": kind, "status": "ok", "posts": posts, "coverage": self._coverage(records=len(posts), scrolls=positive_int(operation.get("max_pages"), 1), warnings=warnings, kind=kind), "warnings": warnings}
             aweme_id = str(operation.get("aweme_id") or "")
             if not aweme_id:
                 return {"op": kind, "status": "invalid_input", "warnings": ["aweme_id_required"]}
-            await self._navigate(page, f"https://www.douyin.com/video/{aweme_id}", warnings)
-            if kind == "fetch_post":
-                title = ""
-                try:
-                    title = (await page.locator("h1").first.inner_text(timeout=2_000)).strip()[:500]
-                except PlaywrightError:
-                    pass
-                return {"op": kind, "status": "ok", "post": {"post_id": aweme_id, "title": title, "content_type": "video", "published_at": None, "public_metrics": {}},
-                        "subtitles": {"available": False, "items": []}, "coverage": self._coverage(records=1, scrolls=0, warnings=warnings, kind=kind), "warnings": warnings + ["subtitle_unavailable_browser_provider"]}
-            # The upstream adapter prints progress messages. Provider stdout is
-            # reserved for our single JSON response, so keep those diagnostics
-            # out of the control-plane protocol.
-            with contextlib.redirect_stdout(io.StringIO()):
-                raw_comments = await self.crawler.fetch_comments(self.upstream_session, aweme_id, max_pages=browser_comment_scrolls(operation.get("max_pages")))
-            comments = self._comments_from_upstream(raw_comments, aweme_id)
-            if self.commenter_secret:
-                warnings.append("commenter_identity_display_name_based")
-            else:
-                warnings.append("commenter_identity_unavailable")
-            if not comments:
-                warnings.append("no_browser_captured_comments_detected")
-            return {"op": kind, "status": "ok", "comments": comments,
-                    "coverage": self._coverage(records=len(comments), scrolls=browser_comment_scrolls(operation.get("max_pages")), warnings=warnings, kind=kind),
-                    "warnings": warnings}
+            if kind == "fetch_comments":
+                return await self._comments_result(page, aweme_id, operation, warnings)
+            blocked = await self._navigate(page, f"https://www.douyin.com/video/{aweme_id}", warnings)
+            if blocked:
+                return self._blocked_result(kind, blocked, warnings)
+            return await self._post_result(page, aweme_id, warnings)
         except ValueError as exc:
             return {"op": kind, "status": "invalid_input", "warnings": warnings, "error": {"type": str(exc)}}
         except PlaywrightError as exc:
@@ -383,7 +595,12 @@ class BrowserProvider:
 
 async def healthcheck(profile_dir: Path, adapter_dir: Path | None) -> dict[str, Any]:
     upstream_adapter_dir(adapter_dir)
-    load_upstream_crawler(upstream_adapter_dir(adapter_dir))
+    crawler = load_upstream_crawler(upstream_adapter_dir(adapter_dir))
+    if (
+        not all(name in inspect.signature(crawler.fetch_comments).parameters for name in ("page", "page_guard"))
+        or not hasattr(crawler, "PageCheckpoint")
+    ):
+        raise UpstreamAdapterIncompatible("douyin_adapter_page_reuse_required")
     playwright = await async_playwright().start()
     try:
         executable = Path(playwright.chromium.executable_path)
@@ -405,6 +622,9 @@ async def main(args: argparse.Namespace) -> int:
             return 0
         except UpstreamAdapterUnavailable:
             emit("blocked_browser_unavailable", warnings=["douyin_adapter_unavailable"])
+            return 2
+        except UpstreamAdapterIncompatible:
+            emit("blocked_browser_unavailable", warnings=["douyin_adapter_page_reuse_required"])
             return 2
         except PlaywrightError:
             emit("blocked_browser_unavailable")
@@ -434,7 +654,8 @@ async def main(args: argparse.Namespace) -> int:
             if not isinstance(operations, list):
                 emit("invalid_plan")
                 return 2
-            results = [await provider.action(item) for item in operations if isinstance(item, dict)]
+            normalized_operations = [item for item in operations if isinstance(item, dict)]
+            results = await execute_operations(provider, normalized_operations, operation_delay_bounds(plan))
             overall = "ok" if results and all(item.get("status") in {"ok", "unsupported"} for item in results) else "partial"
             emit(overall, {"operations": results, "provider_mode": "browser"})
             return 0 if overall == "ok" else 2

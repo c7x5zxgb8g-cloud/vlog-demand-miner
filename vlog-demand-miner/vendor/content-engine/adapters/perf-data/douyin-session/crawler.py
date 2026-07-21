@@ -8,13 +8,21 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from playwright.async_api import BrowserContext, Page, Response, async_playwright
 from paths import auth_dir, debug_dir
 
 CREATOR_HOME = "https://creator.douyin.com/creator-micro/home"
 CREATOR_CONTENT = "https://creator.douyin.com/creator-micro/content/manage"
+
+
+class PageCheckpoint(RuntimeError):
+    """Visible platform checkpoint detected by an embedding provider."""
+
+    def __init__(self, status: str) -> None:
+        super().__init__(status)
+        self.status = status
 
 
 class Session:
@@ -288,12 +296,22 @@ def _normalize_comment_creator(c: dict, default_aweme_id: str) -> dict:
     }
 
 
-async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> list[dict]:
+async def fetch_comments(
+    sess: Session,
+    aweme_id: str,
+    max_pages: int = 60,
+    *,
+    page: Page | None = None,
+    navigate: bool = True,
+    page_guard: Callable[[Page], Awaitable[str | None]] | None = None,
+) -> list[dict]:
     """前台视频页 → 点击评论图标 → 滚动加载 → 拦截 comment/list XHR。"""
     all_comments: list[dict] = []
     all_urls: list[str] = []
 
-    page = await sess.ctx.new_page()
+    owns_page = page is None
+    if page is None:
+        page = await sess.ctx.new_page()
 
     async def on_response(resp: Response) -> None:
         all_urls.append(resp.url)
@@ -307,12 +325,17 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
 
     page.on("response", on_response)
     try:
-        url = f"https://www.douyin.com/video/{aweme_id}"
-        try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        except Exception as e:
-            print(f"[警告] 视频页加载异常：{e}")
-        await asyncio.sleep(6)
+        if navigate:
+            url = f"https://www.douyin.com/video/{aweme_id}"
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            except Exception as e:
+                print(f"[警告] 视频页加载异常：{e}")
+            await asyncio.sleep(6)
+        if page_guard:
+            checkpoint = await page_guard(page)
+            if checkpoint:
+                raise PageCheckpoint(checkpoint)
 
         # 点击 "video-comment-more" 把评论展开（这是"展开评论区"按钮）
         for sel in ['[data-e2e="video-comment-more"]', '[data-e2e="feed-comment-icon"]']:
@@ -370,7 +393,8 @@ async def fetch_comments(sess: Session, aweme_id: str, max_pages: int = 60) -> l
         (debug_path / "comment_urls.txt").write_text("\n".join(all_urls), encoding="utf-8")
         return dedup
     finally:
-        await page.close()
+        if owns_page:
+            await page.close()
 
 
 def _normalize_comment(c: dict) -> dict:

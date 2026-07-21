@@ -42,8 +42,8 @@ DOUYIN_FALLBACK_STATUSES = {
     "blocked_auth", "blocked_verification", "risk_control", "schema_drift",
     "anomalous_empty_result", "unsupported",
 }
-DOUYIN_PROVIDER_REVISION = "nexttake-douyin-browser-v1"
-ACQUISITION_POLICY_REVISION = "serial-low-page-jitter-v1"
+DOUYIN_PROVIDER_REVISION = "nexttake-douyin-browser-v2"
+ACQUISITION_POLICY_REVISION = "serial-persistent-browser-jitter-v2"
 DEFAULT_REQUEST_DELAY_MIN_SECONDS = 6.0
 DEFAULT_REQUEST_DELAY_MAX_SECONDS = 12.0
 BILIBILI_PROFILE_ID = re.compile(r"^/(\d+)(?:/|$)")
@@ -551,6 +551,7 @@ def acquisition_policy(args: argparse.Namespace, platform: str) -> dict[str, Any
         "execution": "serial",
         "request_delay_seconds": {"min": minimum, "max": maximum},
         "sync_page_limit": 1 if platform == "bilibili" else None,
+        "browser_session_scope": "task" if platform == "douyin" else None,
     }
 
 
@@ -598,6 +599,48 @@ def invoke_provider_serialized(
                 sleeper(remaining)
         with tempfile.NamedTemporaryFile("w", suffix=".json", dir=root, delete=False, encoding="utf-8") as handle:
             json.dump({"operations": [operation]}, handle)
+            plan = Path(handle.name)
+        try:
+            return invoke_provider(command, plan)
+        finally:
+            plan.unlink(missing_ok=True)
+            state["revision"] = ACQUISITION_POLICY_REVISION
+            state["platforms"][platform] = {"last_completed_at": clock()}
+            _write_request_gate(state_path, state)
+
+
+def invoke_provider_batch_serialized(
+    project: Path,
+    platform: str,
+    command: list[str],
+    operations: list[dict[str, Any]],
+    delay_bounds: tuple[float, float],
+    *,
+    clock: Callable[[], float] = time.time,
+    sleeper: Callable[[float], None] = time.sleep,
+    jitter: Callable[[float, float], float] = random.uniform,
+) -> dict[str, Any]:
+    """Run one Browser task in a single persistent context under the shared gate."""
+    root, _, _ = paths(project)
+    root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / "provider-request-gate.lock"
+    state_path = root / "provider-request-gate.json"
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        state = _read_request_gate(state_path)
+        platform_state = state["platforms"].get(platform)
+        last_completed = platform_state.get("last_completed_at") if isinstance(platform_state, dict) else None
+        if isinstance(last_completed, (int, float)):
+            delay = jitter(*delay_bounds)
+            remaining = float(last_completed) + delay - clock()
+            if remaining > 0:
+                sleeper(remaining)
+        payload = {
+            "operations": operations,
+            "operation_delay_seconds": {"min": delay_bounds[0], "max": delay_bounds[1]},
+        }
+        with tempfile.NamedTemporaryFile("w", suffix=".json", dir=root, delete=False, encoding="utf-8") as handle:
+            json.dump(payload, handle)
             plan = Path(handle.name)
         try:
             return invoke_provider(command, plan)
@@ -678,7 +721,7 @@ def run_provider(project: Path, platform: str, args: argparse.Namespace, operati
             return invoke_operations_serially(project, platform, command, operations, delay_bounds)
         if args.douyin_provider == "browser":
             command = browser_provider_command(project, args)
-            response = invoke_operations_serially(project, platform, command, operations, delay_bounds)
+            response = invoke_provider_batch_serialized(project, platform, command, operations, delay_bounds)
             response["provider_selection"] = {"requested": "browser", "selected": "browser"}
             return response
         command = [sys.executable, str(provider), "--sidecar-url", args.sidecar_url, "--media-dir", str(root / "media")]
@@ -691,21 +734,21 @@ def run_provider(project: Path, platform: str, args: argparse.Namespace, operati
         responses: list[dict[str, Any]] = []
         fallback_reasons: set[str] = set()
         using_browser = False
-        browser_command: list[str] | None = None
-        for operation in operations:
-            selected_command = browser_command if using_browser else command
-            response = invoke_provider_serialized(project, platform, selected_command or command, operation, delay_bounds)
+        for index, operation in enumerate(operations):
+            response = invoke_provider_serialized(project, platform, command, operation, delay_bounds)
             failed = response_operation_statuses(response)
-            should_fallback = not using_browser and (
+            should_fallback = (
                 response.get("status") == "provider_protocol_error"
                 or bool(failed.intersection(DOUYIN_FALLBACK_STATUSES))
             )
             if should_fallback:
                 fallback_reasons.update(failed.intersection(DOUYIN_FALLBACK_STATUSES) or {"provider_protocol_error"})
                 browser_command = browser_provider_command(project, args)
-                response = invoke_provider_serialized(project, platform, browser_command, operation, delay_bounds)
+                response = invoke_provider_batch_serialized(project, platform, browser_command, operations[index:], delay_bounds)
                 using_browser = True
             responses.append(response)
+            if using_browser:
+                break
         combined = _combine_provider_responses(responses)
         if using_browser:
             combined["provider_selection"] = {"requested": "auto", "selected": "browser", "fallback_from": "sidecar", "reason": sorted(fallback_reasons)}
@@ -929,11 +972,22 @@ def do_creator_discover(
         return {"status": "invalid_input", "error": str(exc)}
     if limit < 1 or limit > 5:
         return {"status": "invalid_input", "error": "discovery_limit_must_be_between_1_and_5"}
-    selected_platforms = list(dict.fromkeys(platforms or sorted(PROVIDERS)))
+    selected_platforms = list(dict.fromkeys(platforms or ["bilibili"]))
     outcomes: list[dict[str, Any]] = []
     for platform in selected_platforms:
         if platform not in PROVIDERS:
             outcomes.append({"platform": platform, "status": "unsupported"})
+            continue
+        if platform == "douyin" and not bool(getattr(args, "enable_experimental_douyin_discovery", False)):
+            outcomes.append({
+                "platform": "douyin",
+                "status": "manual_input_required",
+                "candidates": [],
+                "selected": [],
+                "next_action": "import_benchmark_account",
+                "accepted_inputs": ["account_id", "profile_url", "share_url"],
+                "warnings": ["douyin_browser_keyword_discovery_disabled_by_default"],
+            })
             continue
         try:
             policy = acquisition_policy(args, platform)
@@ -946,6 +1000,7 @@ def do_creator_discover(
             "limit": limit,
             "provider_mode": args.douyin_provider if platform == "douyin" else "cli",
             "provider_revision": f"{DOUYIN_PROVIDER_REVISION}:{args.douyin_adapter_revision}" if platform == "douyin" else "bilibili-cli",
+            "discovery_mode": "experimental_browser" if platform == "douyin" else "automatic_cli",
             "acquisition_policy": policy,
             "discovery_revision": "account-discovery-v3-unique-content-signals",
         }
@@ -994,18 +1049,27 @@ def do_creator_discover(
             "keywords": keywords,
             "candidates": ranked,
             "selected": selected,
-            "warnings": ["search_candidates_require_content_review", "search_relevance_is_not_demand_validation"],
+            "warnings": [
+                "search_candidates_require_content_review",
+                "search_relevance_is_not_demand_validation",
+                *(["experimental_douyin_browser_discovery"] if platform == "douyin" else []),
+            ],
         }
         capture = artifact(project, db, "account.discovery", discovery)
         db.execute("UPDATE tasks SET status='succeeded',artifact_hash=?,error_code=NULL,updated_at=? WHERE id=?", (capture, now(), row["id"])); db.commit()
         outcomes.append({"platform": platform, "status": "ok", **discovery})
     success = [item for item in outcomes if item.get("status") in {"ok", "reused"}]
+    manual_required = [item for item in outcomes if item.get("status") == "manual_input_required"]
     return {
-        "status": "ok" if len(success) == len(outcomes) else "partial" if success else "account_discovery_failed",
+        "status": "ok" if len(success) == len(outcomes) else "partial" if success else "manual_input_required" if manual_required else "account_discovery_failed",
         "track": track,
         "keywords": keywords,
         "platforms": outcomes,
-        "notice": "Discovered accounts are relevance candidates for content research, not evidence of demand or performance.",
+        "notice": (
+            "Douyin keyword discovery is disabled by default; import a benchmark account by ID, profile URL, or share URL."
+            if manual_required and not success
+            else "Discovered accounts are relevance candidates for content research, not evidence of demand or performance."
+        ),
     }
 
 
@@ -1177,7 +1241,7 @@ if __name__ == "__main__":
     commands = parser.add_subparsers(dest="command", required=True)
     init = commands.add_parser("init"); init.add_argument("--name", required=True)
     add = commands.add_parser("creator-add"); add.add_argument("--name", required=True); add.add_argument("--platform", choices=sorted(PROVIDERS), default="douyin"); add.add_argument("--account-id"); add.add_argument("--account-url"); add.add_argument("--sec-user-id"); add.add_argument("--credential-ref")
-    discover = commands.add_parser("creator-discover"); discover.add_argument("--track", required=True); discover.add_argument("--platform", action="append", choices=sorted(PROVIDERS)); discover.add_argument("--keyword", action="append"); discover.add_argument("--limit", type=int, default=3)
+    discover = commands.add_parser("creator-discover"); discover.add_argument("--track", required=True); discover.add_argument("--platform", action="append", choices=sorted(PROVIDERS)); discover.add_argument("--keyword", action="append"); discover.add_argument("--limit", type=int, default=3); discover.add_argument("--enable-experimental-douyin-discovery", action="store_true")
     sync = commands.add_parser("sync"); sync.add_argument("--creator-id", required=True); sync.add_argument("--platform", choices=sorted(PROVIDERS)); sync.add_argument("--pages", type=int, default=1)
     sample = commands.add_parser("sample"); sample.add_argument("--creator-id", required=True); sample.add_argument("--count", type=int, default=6)
     acquire = commands.add_parser("acquire"); acquire.add_argument("--post-id", required=True); acquire.add_argument("--media", action="store_true")

@@ -38,3 +38,7 @@ The vendored tree excludes upstream Git metadata and generated or private runtim
 NextTake keeps this source tree self-contained and points the VDM Douyin Browser Provider at its `douyin-session` adapter by default. Public overrides are `NEXTTAKE_CONTENT_ENGINE_ROOT` and `NEXTTAKE_DOUYIN_ADAPTER_DIR`; upstream-branded compatibility aliases are intentionally not exposed.
 
 NextTake-owned code lives outside this directory. Any future compatibility patch inside the vendored tree must be documented here before the manifest is regenerated.
+
+### Compatibility patches
+
+- `adapters/perf-data/douyin-session/crawler.py` accepts an existing Playwright page and an optional post-navigation checkpoint callback for public comment collection. This lets the NextTake Browser Provider inspect login, verification and risk-control pages before scrolling and reuse the same navigation for public post metadata and comments. The default upstream call signature and behavior remain unchanged.

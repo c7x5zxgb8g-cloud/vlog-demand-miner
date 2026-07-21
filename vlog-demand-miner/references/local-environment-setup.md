@@ -72,9 +72,11 @@ After the window closes, verify the runtime and run a small serial sync:
     python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser doctor
     python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser sync --creator-id "<creator-id>" --pages 1
 
-After successful manual login, automatic account discovery can use the public content search page:
+After successful manual login, experimental account discovery can use the public content search page only when explicitly enabled:
 
-    python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser creator-discover --track "首次租房" --platform douyin --limit 3
+    python3 scripts/vdm.py --project /absolute/path/to/research-project --douyin-provider browser creator-discover --track "首次租房" --platform douyin --limit 3 --enable-experimental-douyin-discovery
+
+The default Douyin discovery path is user-supplied account ID, profile URL, or share URL through `creator-add`. Browser keyword search is intentionally experimental because it creates a larger platform risk surface. Browser operations for one task reuse one persistent context, coalesce public post and comment acquisition into one video-page navigation, and stop the remaining plan on login, verification, risk-control, schema-drift, or anomalous-empty checkpoints.
 
 Browser Provider reuses the upstream persistent browser session and passive XHR capture for public-video comments. VDM never copies, exports, prints, or writes Cookie/browser-storage values to projects, artifacts, reports, model inputs, or logs; it does not download media, solve CAPTCHA, or claim complete/random comment coverage. This upstream public-page path does not expose a stable raw user ID, so Browser comments use an HMAC of the available display name and carry `commenter_identity_display_name_based`; missing names remain unidentified. Never treat comment IDs as independent users. When ASR is required, supply a locally obtained media file and use `transcript-import`.
 
