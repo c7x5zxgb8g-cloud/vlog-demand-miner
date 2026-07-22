@@ -1,6 +1,6 @@
 # Vendored Upstream
 
-This directory contains the complete `cheat-on-content` source used internally by NextTake.
+This directory contains the functional `cheat-on-content` source used internally by NextTake.
 
 - Repository: `https://github.com/XBuilderLAB/cheat-on-content.git`
 - Commit: `9c42fe0c932fe81a12f07428492bdf7ae8488f41`
@@ -18,14 +18,16 @@ NextTake applies interface-only packaging changes while preserving the workflow 
 - creator runtime files use the `.nexttake-*` namespace and environment variables use the `NEXTTAKE_*` namespace;
 - creator-facing templates translate upstream command names into NextTake natural-language actions;
 - the vendor directory is named `content-engine` so runtime paths and diagnostics do not leak the implementation brand.
+- upstream promotional READMEs, badges, Star History assets and their generator are omitted because they are not part of the runtime or maintenance contract.
 
 These transformations do not replace the upstream scoring, prediction, publication, retro, persona or recommendation protocols. `MANIFEST.sha256` records the transformed package actually shipped by NextTake.
 
 ## Clean Copy Policy
 
-The vendored tree excludes upstream Git metadata and generated or private runtime state, including:
+The vendored tree excludes upstream promotional material, Git metadata and generated or private runtime state, including:
 
 - `.git/`
+- promotional READMEs, badges and Star History automation
 - `__pycache__/` and `*.pyc`
 - virtual environments
 - browser profiles, auth state, cookies, tokens and debug output

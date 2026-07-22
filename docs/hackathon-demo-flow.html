@@ -1,0 +1,2226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f8f5ee">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23b42318'/%3E%3Cpath d='M18 40 40 18M26 18h14v14' stroke='white' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <title>下一条 NextTake｜全流程演示</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172027;
+      --muted: #65727b;
+      --line: #d8dee2;
+      --paper: #fffdfa;
+      --canvas: #f5f1e8;
+      --wash: #eef1f2;
+      --red: #b42318;
+      --red-soft: #fff0ed;
+      --blue: #175cd3;
+      --blue-soft: #edf4ff;
+      --green: #18794e;
+      --green-soft: #eaf7f0;
+      --yellow: #8a6100;
+      --yellow-soft: #fff7d6;
+      --shadow: 0 18px 50px rgba(23, 32, 39, 0.09);
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.25rem;
+      --space-6: 1.5rem;
+      --space-8: 2rem;
+      --space-10: 2.5rem;
+      --space-12: 3rem;
+      --space-16: 4rem;
+      --content: 1440px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0 0, rgba(180, 35, 24, 0.05), transparent 30rem),
+        linear-gradient(180deg, #fbf9f4 0, var(--canvas) 72%, #f1ece3 100%);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .skip-link {
+      position: fixed;
+      z-index: 100;
+      top: var(--space-3);
+      left: var(--space-3);
+      padding: var(--space-2) var(--space-4);
+      color: #fff;
+      background: var(--ink);
+      border-radius: var(--radius-sm);
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    :focus-visible {
+      outline: 3px solid rgba(23, 92, 211, 0.35);
+      outline-offset: 3px;
+    }
+
+    .topbar {
+      position: sticky;
+      z-index: 30;
+      top: 0;
+      border-bottom: 1px solid rgba(216, 222, 226, 0.9);
+      background: rgba(251, 249, 244, 0.92);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner,
+    .page {
+      width: min(100% - 2rem, var(--content));
+      margin-inline: auto;
+    }
+
+    .topbar-inner {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-6);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-3);
+      text-decoration: none;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--red);
+      border-radius: 50%;
+      font-size: 1.15rem;
+      line-height: 1;
+    }
+
+    .brand em {
+      color: var(--red);
+      font-style: normal;
+    }
+
+    .topbar-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+
+    .demo-badge,
+    .tag,
+    .artifact {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      border-radius: 999px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .demo-badge {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #e4b323;
+      color: #6f4b00;
+      background: var(--yellow-soft);
+      white-space: nowrap;
+    }
+
+    .demo-badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: #e4a400;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(228, 164, 0, 0.14);
+    }
+
+    .page {
+      padding-bottom: var(--space-16);
+    }
+
+    .hero {
+      min-height: min(720px, calc(100vh - 68px));
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(390px, 0.9fr);
+      align-items: center;
+      gap: clamp(2rem, 7vw, 7rem);
+      padding: clamp(4rem, 9vw, 8rem) 0 var(--space-16);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin: 0 0 var(--space-5);
+      color: var(--red);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 42px;
+      height: 2px;
+      background: currentColor;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 880px;
+      margin-bottom: var(--space-6);
+      font-size: clamp(3rem, 7vw, 6.8rem);
+      line-height: 0.98;
+      letter-spacing: -0.075em;
+    }
+
+    h1 span {
+      color: var(--red);
+    }
+
+    .hero-lead {
+      max-width: 680px;
+      margin-bottom: var(--space-8);
+      color: #3f4a52;
+      font-size: clamp(1rem, 1.5vw, 1.25rem);
+    }
+
+    .hero-actions,
+    .stage-actions,
+    .choice-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+    }
+
+    .button {
+      min-height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: 0.75rem 1.1rem;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius-sm);
+      color: #fff;
+      background: var(--ink);
+      font-weight: 750;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(23, 32, 39, 0.14);
+    }
+
+    .button.secondary {
+      color: var(--ink);
+      background: transparent;
+      border-color: var(--line);
+    }
+
+    .button.secondary:hover {
+      background: #fff;
+    }
+
+    .button.ghost {
+      min-height: 38px;
+      padding: 0.5rem 0.75rem;
+      color: var(--blue);
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    .button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .loop-visual {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-width: 580px;
+      justify-self: end;
+      display: grid;
+      place-items: center;
+    }
+
+    .loop-ring {
+      position: absolute;
+      inset: 8%;
+      border: 2px dashed rgba(23, 32, 39, 0.18);
+      border-radius: 50%;
+      animation: spin 28s linear infinite;
+    }
+
+    .loop-ring::before {
+      content: "↗";
+      position: absolute;
+      top: -17px;
+      left: 50%;
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--red);
+      border-radius: 50%;
+      transform: translateX(-50%) rotate(8deg);
+      font-weight: 900;
+    }
+
+    .loop-core {
+      position: relative;
+      z-index: 2;
+      width: 26%;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      padding: var(--space-6);
+      text-align: center;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      box-shadow: var(--shadow);
+    }
+
+    .loop-core strong {
+      display: block;
+      margin-bottom: var(--space-2);
+      font-size: clamp(1.5rem, 3vw, 2.5rem);
+      letter-spacing: -0.06em;
+    }
+
+    .loop-core span {
+      display: none;
+    }
+
+    .loop-node {
+      position: absolute;
+      z-index: 3;
+      width: 32%;
+      min-width: 132px;
+      padding: var(--space-4);
+      background: rgba(255, 253, 250, 0.96);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 30px rgba(23, 32, 39, 0.08);
+    }
+
+    .loop-node b {
+      display: block;
+      margin-bottom: var(--space-1);
+      font-size: 0.95rem;
+    }
+
+    .loop-node small {
+      display: block;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .loop-node i {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      margin-bottom: var(--space-3);
+      color: #fff;
+      background: var(--blue);
+      border-radius: 50%;
+      font-style: normal;
+      font-weight: 800;
+    }
+
+    .loop-node.discover {
+      top: 0;
+      left: 3%;
+    }
+
+    .loop-node.create {
+      top: 4%;
+      right: 0;
+    }
+
+    .loop-node.learn {
+      right: 0;
+      bottom: 2%;
+    }
+
+    .loop-node.next {
+      bottom: 0;
+      left: 0;
+    }
+
+    .loop-node.create i {
+      background: var(--red);
+    }
+
+    .loop-node.learn i {
+      background: var(--yellow);
+    }
+
+    .loop-node.next i {
+      background: var(--green);
+    }
+
+    .truth-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin-bottom: var(--space-16);
+      border-block: 1px solid var(--line);
+    }
+
+    .truth-item {
+      min-width: 0;
+      padding: var(--space-6);
+      border-right: 1px solid var(--line);
+    }
+
+    .truth-item:last-child {
+      border-right: 0;
+    }
+
+    .truth-item strong {
+      display: block;
+      margin-bottom: var(--space-1);
+      font-size: 1.05rem;
+    }
+
+    .truth-item span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .demo-section {
+      scroll-margin-top: 88px;
+      padding-top: var(--space-8);
+    }
+
+    .section-heading {
+      max-width: 820px;
+      margin-bottom: var(--space-10);
+    }
+
+    .section-heading h2 {
+      margin-bottom: var(--space-4);
+      font-size: clamp(2rem, 4vw, 4rem);
+      line-height: 1.08;
+      letter-spacing: -0.055em;
+    }
+
+    .section-heading p {
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .demo-workbench {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: var(--space-6);
+      align-items: start;
+    }
+
+    .stepper {
+      position: sticky;
+      top: 92px;
+      overflow: hidden;
+      background: rgba(255, 253, 250, 0.76);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 28px rgba(23, 32, 39, 0.05);
+    }
+
+    .stepper-head {
+      padding: var(--space-5);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .stepper-head span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stepper-head strong {
+      display: block;
+      margin-top: var(--space-1);
+    }
+
+    .step-nav {
+      margin: 0;
+      padding: var(--space-2);
+      list-style: none;
+    }
+
+    .step-nav button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border: 0;
+      color: var(--muted);
+      background: transparent;
+      border-radius: var(--radius-sm);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .step-nav button:hover {
+      color: var(--ink);
+      background: var(--wash);
+    }
+
+    .step-nav button[aria-current="step"] {
+      color: var(--ink);
+      background: #fff;
+      box-shadow: inset 3px 0 var(--red);
+      font-weight: 750;
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    [aria-current="step"] .step-number {
+      color: #fff;
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    .stage-shell {
+      min-width: 0;
+      overflow: hidden;
+      background: rgba(255, 253, 250, 0.94);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .stage-top {
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .stage-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-3);
+    }
+
+    .stage-counter {
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress {
+      height: 4px;
+      overflow: hidden;
+      background: var(--line);
+      border-radius: 999px;
+    }
+
+    .progress::before {
+      content: "";
+      display: block;
+      width: var(--progress, 12.5%);
+      height: 100%;
+      background: var(--red);
+      border-radius: inherit;
+      transition: width 280ms ease;
+    }
+
+    .stage {
+      min-height: 660px;
+      padding: clamp(1.25rem, 3vw, 2.5rem);
+    }
+
+    .stage:focus {
+      outline: none;
+    }
+
+    .stage-head {
+      max-width: 820px;
+      margin-bottom: var(--space-8);
+    }
+
+    .stage-kicker {
+      display: block;
+      margin-bottom: var(--space-2);
+      color: var(--red);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .stage-head h3 {
+      margin-bottom: var(--space-3);
+      font-size: clamp(1.75rem, 3vw, 3rem);
+      line-height: 1.1;
+      letter-spacing: -0.05em;
+    }
+
+    .stage-head p {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: var(--space-4);
+    }
+
+    .span-4 {
+      grid-column: span 4;
+    }
+
+    .span-5 {
+      grid-column: span 5;
+    }
+
+    .span-6 {
+      grid-column: span 6;
+    }
+
+    .span-7 {
+      grid-column: span 7;
+    }
+
+    .span-8 {
+      grid-column: span 8;
+    }
+
+    .span-12 {
+      grid-column: 1 / -1;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: var(--space-5);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .panel.flush {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .opportunity-header {
+      padding: var(--space-5) var(--space-5) 0;
+    }
+
+    .mt-4 {
+      margin-top: var(--space-4);
+    }
+
+    .mb-4 {
+      margin-bottom: var(--space-4);
+    }
+
+    .panel.accent {
+      background: var(--red-soft);
+      border-color: rgba(180, 35, 24, 0.24);
+    }
+
+    .panel.blue {
+      background: var(--blue-soft);
+      border-color: rgba(23, 92, 211, 0.22);
+    }
+
+    .panel.yellow {
+      background: var(--yellow-soft);
+      border-color: rgba(138, 97, 0, 0.22);
+    }
+
+    .panel.green {
+      background: var(--green-soft);
+      border-color: rgba(24, 121, 78, 0.22);
+    }
+
+    .panel-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .panel h4 {
+      margin: 0 0 var(--space-2);
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+
+    .panel p:last-child {
+      margin-bottom: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .track-option,
+    .mode-option {
+      position: relative;
+      height: 100%;
+      padding: var(--space-5);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+    }
+
+    .track-option.selected,
+    .mode-option.selected {
+      border-color: var(--red);
+      box-shadow: inset 0 0 0 1px var(--red);
+    }
+
+    .track-option.selected::after,
+    .mode-option.selected::after {
+      content: "本次演示";
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      padding: 0.35rem 0.55rem;
+      color: var(--red);
+      background: var(--red-soft);
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .track-option b,
+    .mode-option b {
+      display: block;
+      padding-right: 4.5rem;
+      margin-bottom: var(--space-2);
+    }
+
+    .track-option small,
+    .mode-option small {
+      display: block;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .prompt-box {
+      position: relative;
+      padding: var(--space-5);
+      color: #f5f7f8;
+      background: var(--ink);
+      border-radius: var(--radius-md);
+    }
+
+    .prompt-box .panel-label {
+      color: #aeb9c1;
+    }
+
+    .prompt-box pre {
+      margin: 0;
+      overflow: auto;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .copy-button {
+      padding: 0.4rem 0.65rem;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .copy-button:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .artifact-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+    }
+
+    .artifact {
+      padding: 0.55rem 0.7rem;
+      color: #344054;
+      background: var(--wash);
+      font-size: 0.78rem;
+    }
+
+    .artifact::before {
+      content: "✓";
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .data-pipeline {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: pipeline;
+    }
+
+    .data-pipeline li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 38px 1fr auto;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 62px;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--line);
+      counter-increment: pipeline;
+    }
+
+    .data-pipeline li:last-child {
+      border-bottom: 0;
+    }
+
+    .data-pipeline li::before {
+      content: counter(pipeline);
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      color: var(--blue);
+      background: var(--blue-soft);
+      border-radius: 50%;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .data-pipeline b,
+    .data-pipeline small {
+      display: block;
+    }
+
+    .data-pipeline small {
+      color: var(--muted);
+    }
+
+    .status-ok {
+      color: var(--green);
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    blockquote {
+      margin: 0;
+      padding: var(--space-5);
+      color: #28323a;
+      background: #fff;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 1.06rem;
+    }
+
+    .coverage {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+    }
+
+    .coverage div {
+      padding: var(--space-3);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      text-align: center;
+    }
+
+    .coverage strong,
+    .coverage span {
+      display: block;
+    }
+
+    .coverage strong {
+      font-size: 1.25rem;
+    }
+
+    .coverage span {
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .opportunity-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .opportunity {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 80px 80px;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .opportunity:last-child {
+      border-bottom: 0;
+    }
+
+    .opportunity.selected {
+      background: var(--red-soft);
+      box-shadow: inset 4px 0 var(--red);
+    }
+
+    .rank {
+      color: var(--muted);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .opportunity b,
+    .opportunity small {
+      display: block;
+    }
+
+    .opportunity small {
+      color: var(--muted);
+    }
+
+    .score {
+      font-size: 1.1rem;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    .confidence {
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: right;
+    }
+
+    .tag {
+      width: fit-content;
+      padding: 0.45rem 0.6rem;
+      color: var(--blue);
+      background: var(--blue-soft);
+      font-size: 0.75rem;
+    }
+
+    .tag.red {
+      color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .tag.green {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .tag.yellow {
+      color: var(--yellow);
+      background: var(--yellow-soft);
+    }
+
+    .script-sheet {
+      position: relative;
+      padding: var(--space-6);
+      background:
+        linear-gradient(90deg, transparent 30px, rgba(180, 35, 24, 0.12) 31px, transparent 32px),
+        repeating-linear-gradient(180deg, #fff 0, #fff 31px, #edf0f2 32px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 12px 34px rgba(23, 32, 39, 0.08);
+    }
+
+    .script-sheet h4 {
+      margin-bottom: var(--space-4);
+      padding-left: var(--space-4);
+      font-size: 1.25rem;
+      line-height: 1.35;
+    }
+
+    .script-sheet p {
+      padding-left: var(--space-4);
+      line-height: 2;
+    }
+
+    details {
+      border-top: 1px solid var(--line);
+    }
+
+    details:first-of-type {
+      border-top: 0;
+    }
+
+    summary {
+      padding: var(--space-3) 0;
+      color: var(--blue);
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .prediction-grid,
+    .metric-grid,
+    .verdict-grid {
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .prediction-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .metric-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .metric {
+      padding: var(--space-4);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }
+
+    .metric span,
+    .metric small,
+    .metric strong {
+      display: block;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .metric strong {
+      margin: var(--space-1) 0;
+      font-size: clamp(1.25rem, 2.5vw, 2rem);
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric small {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .manual-gate {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      padding: var(--space-5);
+      color: #6f4b00;
+      background: var(--yellow-soft);
+      border: 1px solid rgba(138, 97, 0, 0.24);
+      border-radius: var(--radius-md);
+    }
+
+    .manual-gate .gate-icon {
+      flex: 0 0 auto;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--yellow);
+      border-radius: 50%;
+      font-weight: 900;
+    }
+
+    .manual-gate b,
+    .manual-gate span {
+      display: block;
+    }
+
+    .manual-gate span {
+      margin-top: var(--space-1);
+      font-size: 0.88rem;
+    }
+
+    .comment-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .comment-list li {
+      position: relative;
+      padding: var(--space-3) 0 var(--space-3) var(--space-6);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .comment-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .comment-list li::before {
+      content: "“";
+      position: absolute;
+      left: 0;
+      top: var(--space-2);
+      color: var(--red);
+      font-family: Georgia, serif;
+      font-size: 1.8rem;
+      font-weight: 900;
+    }
+
+    .verdict-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .verdict {
+      padding: var(--space-4);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: #fff;
+    }
+
+    .verdict b,
+    .verdict span {
+      display: block;
+    }
+
+    .verdict b {
+      margin-bottom: var(--space-2);
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+    }
+
+    .verdict span {
+      font-size: 0.88rem;
+    }
+
+    .verdict.refuted {
+      border-top: 4px solid var(--red);
+    }
+
+    .verdict.refuted b {
+      color: var(--red);
+    }
+
+    .verdict.validated {
+      border-top: 4px solid var(--green);
+    }
+
+    .verdict.validated b {
+      color: var(--green);
+    }
+
+    .verdict.inconclusive {
+      border-top: 4px solid var(--yellow);
+    }
+
+    .verdict.inconclusive b {
+      color: var(--yellow);
+    }
+
+    .change-chain {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+      align-items: stretch;
+      gap: var(--space-3);
+    }
+
+    .change-card {
+      padding: var(--space-5);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .change-card.after {
+      border-color: var(--red);
+      box-shadow: inset 0 0 0 1px var(--red);
+    }
+
+    .change-card small,
+    .change-card strong,
+    .change-card span {
+      display: block;
+    }
+
+    .change-card small {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .change-card strong {
+      margin: var(--space-2) 0;
+      font-size: 1.2rem;
+    }
+
+    .change-card span {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .change-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--red);
+      font-size: 1.8rem;
+      font-weight: 900;
+    }
+
+    .stage-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      background: #faf9f6;
+      border-top: 1px solid var(--line);
+    }
+
+    .auto-status {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .auto-status[data-active="true"] {
+      color: var(--green);
+      font-weight: 750;
+    }
+
+    .auto-status[data-active="true"]::before {
+      content: "●";
+      margin-right: var(--space-2);
+    }
+
+    .closing {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: var(--space-8);
+      margin-top: var(--space-16);
+      padding: clamp(2rem, 5vw, 4rem);
+      color: #fff;
+      background: var(--ink);
+      border-radius: var(--radius-lg);
+    }
+
+    .closing h2 {
+      max-width: 760px;
+      margin-bottom: var(--space-3);
+      font-size: clamp(2rem, 4vw, 4.2rem);
+      line-height: 1.05;
+      letter-spacing: -0.055em;
+    }
+
+    .closing p {
+      max-width: 720px;
+      margin-bottom: 0;
+      color: #b9c2c8;
+    }
+
+    .closing .button {
+      color: var(--ink);
+      background: #fff;
+      border-color: #fff;
+      white-space: nowrap;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .loop-visual {
+        width: min(100%, 560px);
+        justify-self: center;
+      }
+
+      .demo-workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .stepper {
+        position: static;
+      }
+
+      .stepper-head {
+        display: none;
+      }
+
+      .step-nav {
+        display: flex;
+        gap: var(--space-2);
+        overflow-x: auto;
+        padding: var(--space-3);
+        scrollbar-width: thin;
+      }
+
+      .step-nav li {
+        flex: 0 0 auto;
+      }
+
+      .step-nav button {
+        width: auto;
+        min-width: 152px;
+      }
+
+      .step-nav button[aria-current="step"] {
+        box-shadow: inset 0 -3px var(--red);
+      }
+
+      .span-4,
+      .span-5,
+      .span-6,
+      .span-7,
+      .span-8 {
+        grid-column: span 6;
+      }
+
+      .verdict-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner {
+        min-height: 60px;
+      }
+
+      .topbar-meta > span:not(.demo-badge) {
+        display: none;
+      }
+
+      .hero {
+        gap: var(--space-12);
+        padding-top: var(--space-16);
+      }
+
+      h1 {
+        font-size: clamp(2.8rem, 16vw, 4.5rem);
+      }
+
+      .loop-node {
+        min-width: 112px;
+        padding: var(--space-3);
+      }
+
+      .loop-node i {
+        width: 28px;
+        height: 28px;
+        margin-bottom: var(--space-2);
+      }
+
+      .truth-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .truth-item {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .truth-item:last-child {
+        border-bottom: 0;
+      }
+
+      .stage {
+        min-height: 0;
+      }
+
+      .stage-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .span-4,
+      .span-5,
+      .span-6,
+      .span-7,
+      .span-8,
+      .span-12 {
+        grid-column: 1;
+      }
+
+      .opportunity {
+        grid-template-columns: 34px 1fr;
+      }
+
+      .opportunity .score,
+      .opportunity .confidence {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .metric-grid,
+      .prediction-grid,
+      .verdict-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .coverage {
+        grid-template-columns: 1fr;
+      }
+
+      .change-chain {
+        grid-template-columns: 1fr;
+      }
+
+      .change-arrow {
+        transform: rotate(90deg);
+      }
+
+      .stage-footer,
+      .closing {
+        display: block;
+      }
+
+      .stage-actions {
+        margin-top: var(--space-4);
+      }
+
+      .stage-actions .button {
+        flex: 1 1 40%;
+      }
+
+      .closing .button {
+        margin-top: var(--space-6);
+      }
+    }
+
+    @media (max-width: 420px) {
+      .page,
+      .topbar-inner {
+        width: min(100% - 1.25rem, var(--content));
+      }
+
+      .brand span:last-child {
+        font-size: 0.9rem;
+      }
+
+      .hero-actions .button {
+        width: 100%;
+      }
+
+      .loop-visual {
+        transform: scale(0.94);
+      }
+
+      .loop-node {
+        font-size: 0.8rem;
+      }
+
+      .stage-top,
+      .stage-footer {
+        padding-inline: var(--space-4);
+      }
+
+      .stage {
+        padding: var(--space-4);
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stage-actions .button {
+        width: 100%;
+        flex-basis: 100%;
+      }
+    }
+
+    @media print {
+      .topbar,
+      .hero-actions,
+      .stepper,
+      .stage-footer,
+      .copy-button {
+        display: none !important;
+      }
+
+      body {
+        background: #fff;
+      }
+
+      .hero {
+        min-height: 0;
+        page-break-after: always;
+      }
+
+      .demo-workbench {
+        display: block;
+      }
+
+      .stage-shell {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#demo-stage">跳到全流程演示</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="下一条 NextTake 演示首页">
+        <span class="brand-mark" aria-hidden="true">↗</span>
+        <span>下一条 <em>NextTake</em></span>
+      </a>
+      <div class="topbar-meta">
+        <span>全流程 · 约 4 分钟</span>
+        <span class="demo-badge">离线演示数据</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="top" class="page">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow">Hackathon walkthrough</p>
+        <h1 id="hero-title">让上一条，决定<span>下一条。</span></h1>
+        <p class="hero-lead">
+          从选择赛道、采集公开内容，到生成第一篇文案；再从人工发布后的播放与评论中学习，
+          让第二篇文案比第一篇更具体、更有依据。
+        </p>
+        <div class="hero-actions">
+          <button class="button" id="start-tour" type="button">开始全流程导览 <span aria-hidden="true">→</span></button>
+          <a class="button secondary" href="#demo-stage">直接查看 8 个步骤</a>
+        </div>
+      </div>
+
+      <div class="loop-visual" aria-label="发现、创作、复盘、下一条组成的循环">
+        <div class="loop-ring" aria-hidden="true"></div>
+        <div class="loop-core">
+          <div>
+            <strong>1 → 2</strong>
+            <span>不是多写一篇，而是用结果写得更准</span>
+          </div>
+        </div>
+        <div class="loop-node discover">
+          <i aria-hidden="true">01</i>
+          <b>发现</b>
+          <small>公开视频与评论变成 Evidence</small>
+        </div>
+        <div class="loop-node create">
+          <i aria-hidden="true">02</i>
+          <b>创作</b>
+          <small>生成文案并留下发布前判断</small>
+        </div>
+        <div class="loop-node learn">
+          <i aria-hidden="true">03</i>
+          <b>复盘</b>
+          <small>导入匿名指标与评论对账</small>
+        </div>
+        <div class="loop-node next">
+          <i aria-hidden="true">04</i>
+          <b>下一条</b>
+          <small>受众变化直接改写下一篇</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="truth-strip" aria-label="演示边界">
+      <div class="truth-item">
+        <strong>公开证据，不是凭空选题</strong>
+        <span>每个内容机会保留观众原话、覆盖范围与样本限制。</span>
+      </div>
+      <div class="truth-item">
+        <strong>创作者手动拍摄与发布</strong>
+        <span>NextTake 负责生成、记录和复盘，不自动上传平台。</span>
+      </div>
+      <div class="truth-item">
+        <strong>演示结果，不是流量承诺</strong>
+        <span>本页的发布与表现数据为固定演示数据，方法可重复。</span>
+      </div>
+    </section>
+
+    <section class="demo-section" id="demo-stage" aria-labelledby="demo-title">
+      <div class="section-heading">
+        <p class="eyebrow">One complete cycle</p>
+        <h2 id="demo-title">评委看到的，不只是结果，而是每一步怎么用。</h2>
+        <p>点击左侧步骤，或使用“自动播放”，完整走一遍团播求职避坑赛道的创作实验。</p>
+      </div>
+
+      <div class="demo-workbench">
+        <nav class="stepper" aria-label="演示步骤">
+          <div class="stepper-head">
+            <span>本轮导览</span>
+            <strong>8 个公开动作</strong>
+          </div>
+          <ol class="step-nav" id="step-nav">
+            <li><button type="button" data-step="0" aria-current="step"><span class="step-number">01</span><span>选择赛道</span></button></li>
+            <li><button type="button" data-step="1"><span class="step-number">02</span><span>选择账号来源</span></button></li>
+            <li><button type="button" data-step="2"><span class="step-number">03</span><span>采集公开数据</span></button></li>
+            <li><button type="button" data-step="3"><span class="step-number">04</span><span>选择内容机会</span></button></li>
+            <li><button type="button" data-step="4"><span class="step-number">05</span><span>生成首篇文案</span></button></li>
+            <li><button type="button" data-step="5"><span class="step-number">06</span><span>导入发布数据</span></button></li>
+            <li><button type="button" data-step="6"><span class="step-number">07</span><span>复盘并更新受众</span></button></li>
+            <li><button type="button" data-step="7"><span class="step-number">08</span><span>生成第二篇文案</span></button></li>
+          </ol>
+        </nav>
+
+        <div class="stage-shell">
+          <div class="stage-top">
+            <div class="stage-top-row">
+              <span class="stage-counter" id="stage-counter">步骤 01 / 08</span>
+              <span class="tag red" id="stage-phase">Discover · 发现</span>
+            </div>
+            <div class="progress" id="progress" role="progressbar" aria-label="演示进度" aria-valuemin="1" aria-valuemax="8" aria-valuenow="1"></div>
+          </div>
+
+          <article class="stage" id="stage" tabindex="-1"></article>
+
+          <div class="stage-footer">
+            <span class="auto-status" id="auto-status" data-active="false">手动导览</span>
+            <div class="stage-actions">
+              <button class="button secondary" id="prev-step" type="button">← 上一步</button>
+              <button class="button secondary" id="auto-play" type="button" aria-pressed="false">自动播放</button>
+              <button class="button" id="next-step" type="button">下一步 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="sr-only" id="announcement" aria-live="polite"></p>
+    </section>
+
+    <section class="closing" aria-labelledby="closing-title">
+      <div>
+        <h2 id="closing-title">一条内容结束，下一条已经有了更好的起点。</h2>
+        <p>NextTake 把公开 Evidence、发布前判断、匿名表现和评论需求放在同一条可追溯链路里。</p>
+      </div>
+      <button class="button" type="button" id="replay-tour">重新播放一轮</button>
+    </section>
+  </main>
+
+  <template id="step-0">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 01 · Discover</span>
+      <h3>先选择赛道，也先说清楚为谁创作。</h3>
+      <p>一个创作者项目对应一个明确账号定位。赛道、内容形式、时长与受众会约束后续研究和文案。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="track-option selected span-4">
+        <b>团播求职避坑</b>
+        <small>单人口播 · 60–90 秒 · 面向准备进入团播行业的年轻求职者</small>
+      </div>
+      <div class="track-option span-4">
+        <b>首次租房避坑</b>
+        <small>可替换赛道。研究与创作者数据将保存在独立项目中。</small>
+      </div>
+      <div class="track-option span-4">
+        <b>新手自由职业</b>
+        <small>可替换赛道。每个账号都能建立自己的长期受众画像。</small>
+      </div>
+      <div class="prompt-box span-7">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>初始化创作者项目。
+内容方向：团播求职避坑
+内容形式：单人口播
+典型时长：60 到 90 秒
+目标受众：准备进入团播行业的年轻求职者
+历史样本：没有，按冷启动处理。</pre>
+      </div>
+      <div class="panel span-5">
+        <div class="panel-label"><span>本步产出</span><span class="tag green">已准备</span></div>
+        <h4>一个可持续复盘的创作者项目</h4>
+        <p class="muted">候选选题、文案、发布前判断、复盘和受众画像从这里开始积累。</p>
+        <div class="artifact-row">
+          <span class="artifact">受众画像</span>
+          <span class="artifact">候选选题池</span>
+          <span class="artifact">评分规则</span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-1">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 02 · Discover</span>
+      <h3>选择参考账号的来源：自动找，或由创作者提供。</h3>
+      <p>两种方式最终进入同一条受控采集链路。演示采用用户提供的脱敏账号，避免现场依赖平台登录。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="mode-option span-6">
+        <b>根据赛道寻找对标账号</b>
+        <small>B站可自动检索；抖音关键词检索需要人工登录并显式开启实验能力。每个平台最多登记 1–5 个候选。</small>
+      </div>
+      <div class="mode-option selected span-6">
+        <b>登记用户提供的对标账号</b>
+        <small>输入主页链接、分享链接或账号 ID。抖音默认推荐这条路径，本次离线演示使用脱敏试点数据。</small>
+      </div>
+      <div class="prompt-box span-7">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>初始化同赛道研究项目。
+研究名称：团播求职内容机会
+目标受众：准备进入团播行业的年轻求职者
+
+登记我提供的对标账号，先做小样本研究：
+只同步 1 页，采集公开作品信息与公开评论。
+需要登录或验证码时暂停，让我手动完成。</pre>
+      </div>
+      <div class="panel yellow span-5">
+        <div class="panel-label"><span>安全边界</span><span class="tag yellow">人工确认</span></div>
+        <h4>登录与风控不会被绕过</h4>
+        <p>Cookie、Token、浏览器 Profile 和用户身份信息不会进入研究项目或演示页面。</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-2">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 03 · Discover</span>
+      <h3>采集公开内容，再把“视频说什么”和“观众问什么”分开。</h3>
+      <p>平台采集与 Evidence 提取分离。内容机会必须能回到公开原话，也必须同时显示覆盖不足。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="panel span-7">
+        <div class="panel-label"><span>受控采集队列</span><span class="tag green">离线夹具已完成</span></div>
+        <ol class="data-pipeline">
+          <li><div><b>登记脱敏对标账号</b><small>账号信息仅用于研究路由</small></div><span class="status-ok">完成</span></li>
+          <li><div><b>同步第 1 页公开作品</b><small>串行执行，避免重复导航</small></div><span class="status-ok">完成</span></li>
+          <li><div><b>采集相关作品与公开评论</b><small>视频文本和评论分开保存</small></div><span class="status-ok">完成</span></li>
+          <li><div><b>提取可追溯 Evidence</b><small>只允许引用来源中的逐字片段</small></div><span class="status-ok">完成</span></li>
+        </ol>
+      </div>
+      <div class="panel blue span-5">
+        <div class="panel-label"><span>一条真实试点 Evidence</span><span class="tag">公开评论</span></div>
+        <blockquote>“你们说女生做团播真能挣到钱吗？”</blockquote>
+        <div class="coverage" aria-label="当前证据覆盖">
+          <div><strong>1</strong><span>独立创作者</span></div>
+          <div><strong>1</strong><span>相关作品</span></div>
+          <div><strong>1</strong><span>直接提问者</span></div>
+        </div>
+        <p class="muted mt-4">这是早期需求信号，不代表整个赛道，也不能保证未来播放量。</p>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>继续分析同赛道内容和评论：
+1. 将视频文本与评论分开提取 Evidence；
+2. 聚类为具体受众问题；
+3. 展示观众原话、支持证据、反证和样本限制；
+4. 先生成研究报告，不要写文案。</pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-3">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 04 · Discover → Create</span>
+      <h3>4 个内容机会里，选择与账号定位最匹配的一个。</h3>
+      <p>需求分只帮助排序，不代表市场规模。这里选择“收入能否支撑职业选择”，因为它最贴近求职者决策。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="panel flush span-8">
+        <div class="panel-label opportunity-header"><span>脱敏试点内容机会</span><span>需求分 / 置信度</span></div>
+        <ol class="opportunity-list">
+          <li class="opportunity"><span class="rank">01</span><div><b>误操作后的服务补救与流失</b><small>付费支持者体验</small></div><span class="score">35.2</span><span class="confidence">63.1%</span></li>
+          <li class="opportunity"><span class="rank">02</span><div><b>长时直播的体力消耗与恢复</b><small>职业健康</small></div><span class="score">29.2</span><span class="confidence">66.2%</span></li>
+          <li class="opportunity selected"><span class="rank">03</span><div><b>团播收入能否支撑职业选择</b><small>本轮选择 · 求职决策</small></div><span class="score">26.9</span><span class="confidence">62.3%</span></li>
+          <li class="opportunity"><span class="rank">04</span><div><b>拉票话术与个人职业边界冲突</b><small>职业边界</small></div><span class="score">26.0</span><span class="confidence">63.3%</span></li>
+        </ol>
+      </div>
+      <div class="panel accent span-4">
+        <div class="panel-label"><span>为什么选它</span><span class="tag red">人工选择</span></div>
+        <h4>不是分最高，而是最符合账号本轮目标</h4>
+        <p>账号定位是“团播求职避坑”。收入结构是进入行业前最直接的决策问题，也能自然延伸到合同、时长和公司筛选。</p>
+        <div class="artifact-row">
+          <span class="artifact">观众问题</span>
+          <span class="artifact">证据与限制</span>
+          <span class="artifact">内容候选</span>
+        </div>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>选择“团播收入能否支撑职业选择”这个内容机会。
+把它导入我的创作者项目。
+保留支持证据、反证和样本限制，然后告诉我下一步。</pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-4">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 05 · Create</span>
+      <h3>基于 Evidence 生成第一篇文案，并在发布前留下可验证判断。</h3>
+      <p>系统不会把创作者整理的清单伪装成外部事实。最终稿确认后，发布前判断被锁定，不能根据结果倒改。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="script-sheet span-7">
+        <span class="tag red">第一篇完整文案</span>
+        <h4>做团播到底能不能赚钱？先把这四笔账问清楚</h4>
+        <p>有人问，女生做团播到底能不能赚钱。这个问题最容易得到两种没用的答案：一种说特别赚钱，一种说千万别去。真正该问的不是收入上限，而是这份收入到底怎么组成。</p>
+        <details>
+          <summary>查看文案核心结构</summary>
+          <p>去面试时，先把四笔账问清楚：有没有无条件底薪；礼物流水怎么分成；试播、培训、妆造和住宿成本由谁承担；结算周期和离职后的未结算部分怎么处理。</p>
+          <p>如果对方只重复“上不封顶”，却不愿意把计算方式写进合同，这本身就是信息。下一期会整理团播公司面试反向提问清单。</p>
+        </details>
+      </div>
+      <div class="span-5">
+        <div class="panel blue mb-4">
+          <div class="panel-label"><span>发布前判断</span><span class="tag yellow">低置信度</span></div>
+          <div class="prediction-grid">
+            <div class="metric"><span>稿件综合分</span><strong>7.1</strong><small>冷启动评分</small></div>
+            <div class="metric"><span>播放区间判断</span><strong>5–30 万</strong><small>不是流量承诺</small></div>
+          </div>
+          <p class="mt-4"><b>本轮押注：</b>四项决策清单会带来收藏，并引出底薪、提成和公司筛选的评论。</p>
+        </div>
+        <div class="panel yellow">
+          <div class="panel-label"><span>证据纪律</span><span>发布前</span></div>
+          <p><b>Evidence：</b>观众明确询问能否挣钱。</p>
+          <p><b>创作者原创：</b>“四笔账”是决策框架，不冒充采集到的事实。</p>
+        </div>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>根据刚才导入的内容机会生成本期完整文案。
+目标时长 60 到 90 秒，表达直接、具体，不夸大收入。
+包含 Hook、完整口播、拍摄结构、互动问题和 Evidence 限制。
+我确认最终稿后，给文案打分并启动发布前预测。</pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-5">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 06 · Publish → Learn</span>
+      <h3>创作者手动发布；72 小时后，只导入原始指标与匿名评论。</h3>
+      <p>NextTake 不调用上传接口。固定观察窗口让不同作品可以长期比较，原始比例由系统重新计算。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="manual-gate span-12">
+        <span class="gate-icon" aria-hidden="true">手</span>
+        <div><b>这里必须由创作者完成拍摄与平台发布</b><span>发布后只登记公开视频链接和时间。演示数据不会被伪装成真实账号表现。</span></div>
+      </div>
+      <div class="panel span-7">
+        <div class="panel-label"><span>发布后 72 小时原始数据</span><span class="tag yellow">演示数据</span></div>
+        <div class="metric-grid">
+          <div class="metric"><span>播放</span><strong>12,840</strong><small>views</small></div>
+          <div class="metric"><span>点赞</span><strong>1,126</strong><small>8.77%</small></div>
+          <div class="metric"><span>收藏</span><strong>394</strong><small>3.07%</small></div>
+          <div class="metric"><span>评论</span><strong>143</strong><small>1.11%</small></div>
+          <div class="metric"><span>分享</span><strong>216</strong><small>1.68%</small></div>
+          <div class="metric"><span>关注</span><strong>87</strong><small>0.68%</small></div>
+          <div class="metric"><span>完播率</span><strong>38%</strong><small>completion</small></div>
+          <div class="metric"><span>观察窗口</span><strong>72h</strong><small>固定口径</small></div>
+        </div>
+      </div>
+      <div class="panel span-5">
+        <div class="panel-label"><span>匿名 Top 评论</span><span>不含用户 ID</span></div>
+        <ul class="comment-list">
+          <li>能不能讲讲底薪、提成和流水到底怎么算？</li>
+          <li>下一期想看怎么判断公司靠不靠谱。</li>
+          <li>六小时直播身体真的吃不消。</li>
+          <li>不是每家公司都这样，收入还是看个人能力。</li>
+        </ul>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>登记我已经手动发布的作品。
+观察窗口：发布后 72 小时。
+导入播放、点赞、收藏、评论、分享、关注、完播率和匿名 Top 评论。
+保存原始数据，自动重算比例，并对照发布前判断复盘。</pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-6">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 07 · Learn</span>
+      <h3>不是只看“数据好不好”，而是逐项判断先前押注发生了什么。</h3>
+      <p>触达判断被推翻，收藏和评论主题得到验证；单条演示结果不足以升级长期规则。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="verdict-grid span-12">
+        <div class="verdict refuted"><b>被推翻</b><span>播放 12,840，低于发布前判断的 5–30 万区间。</span></div>
+        <div class="verdict validated"><b>被验证</b><span>收藏率 3.07%，决策清单确实产生保存意图。</span></div>
+        <div class="verdict validated"><b>被验证</b><span>评论继续追问底薪、提成、流水和公司筛选。</span></div>
+        <div class="verdict inconclusive"><b>暂无法判断</b><span>只有一条演示样本，无法证明题材稳定优于其他内容。</span></div>
+      </div>
+      <div class="panel green span-6">
+        <div class="panel-label"><span>更新后的受众画像</span><span class="tag green">早期信号</span></div>
+        <h4>不信任“轻松高薪”的年轻求职者</h4>
+        <p>她们需要的不是鼓励或劝退，而是能带进面试现场的具体问题，以及收入、时长与运营边界之间的真实交换关系。</p>
+      </div>
+      <div class="panel accent span-6">
+        <div class="panel-label"><span>下一条推荐</span><span class="tag red">评论驱动</span></div>
+        <h4>面试团播公司，必须反向问的 7 个问题</h4>
+        <p>从“团播能不能挣钱”推进到“如何判断一家公司是否靠谱”，并主动纳入不同公司存在差异的反证。</p>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>根据本期表现和匿名评论更新受众画像。
+推荐下一条内容，并说明引用了哪些评论或原始 Evidence。
+告诉我下一条为什么与第一条不同，不要把单条结果升级成长期规律。</pre>
+      </div>
+    </div>
+  </template>
+
+  <template id="step-7">
+    <header class="stage-head">
+      <span class="stage-kicker">Step 08 · Next</span>
+      <h3>第二篇不是随机续写，而是第一篇结果的具体回应。</h3>
+      <p>观众从“能不能赚钱”追问到“公司是否靠谱”，于是下一篇从泛收入问题收敛为可带进面试的七问清单。</p>
+    </header>
+    <div class="stage-grid">
+      <div class="change-chain span-12">
+        <div class="change-card">
+          <small>第一篇 · 发布前</small>
+          <strong>做团播到底能不能赚钱？</strong>
+          <span>四笔账：底薪、分成、成本、结算。解决“该不该进入”的初步判断。</span>
+        </div>
+        <div class="change-arrow" aria-hidden="true">→</div>
+        <div class="change-card after">
+          <small>第二篇 · 复盘后</small>
+          <strong>面试团播公司，先反问这 7 个问题</strong>
+          <span>新增合同、时长、运营边界与匿名收入区间。解决“怎么筛选公司”的具体行动。</span>
+        </div>
+      </div>
+      <div class="script-sheet span-8">
+        <span class="tag red">第二篇完整文案</span>
+        <h4>面试团播公司，先反问这 7 个问题</h4>
+        <p>去面试团播公司，对方最希望你问的是“我一个月最多能赚多少”。但你真正要问的，是普通新人怎么拿到手、需要付出什么，以及哪些条件不会只停留在口头承诺。</p>
+        <details>
+          <summary>查看第二篇如何吸收复盘</summary>
+          <p>前四问覆盖底薪条件、流水扣除、试播与妆造费用、直播之外的准备时长；后三问覆盖离职结算、私下维护付费用户的边界，以及普通新人三个月的匿名收入区间。</p>
+          <p>如果对方只愿意说“上不封顶”，却不愿意把计算方式、工作时长和结算规则写下来，你得到的已经是答案。面试不是只有公司筛选你，你也在筛选一套自己能不能长期承受的工作方式。</p>
+        </details>
+      </div>
+      <div class="panel blue span-4">
+        <div class="panel-label"><span>完整闭环产物</span><span class="tag green">已完成</span></div>
+        <div class="artifact-row">
+          <span class="artifact">公开 Evidence</span>
+          <span class="artifact">内容机会</span>
+          <span class="artifact">第一篇文案</span>
+          <span class="artifact">发布前判断</span>
+          <span class="artifact">表现复盘</span>
+          <span class="artifact">受众画像</span>
+          <span class="artifact">下一条推荐</span>
+          <span class="artifact">第二篇文案</span>
+        </div>
+        <p class="muted mt-4">下一轮会继续用同一方法：发布前留下判断，发布后用结果对账。</p>
+      </div>
+      <div class="prompt-box span-12">
+        <div class="panel-label"><span>你对 NextTake 说</span><button class="copy-button" type="button">复制提示词</button></div>
+        <pre>根据刚才的下一条推荐生成下一期完整文案。
+写入创作者项目，并说明：
+1. 使用了哪些本期评论或原始 Evidence；
+2. 第二篇相对第一篇具体改变了什么；
+3. 还有哪些结论需要下一次发布继续验证。</pre>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var stepTitles = [
+        "选择赛道",
+        "选择账号来源",
+        "采集公开数据",
+        "选择内容机会",
+        "生成首篇文案",
+        "导入发布数据",
+        "复盘并更新受众",
+        "生成第二篇文案"
+      ];
+      var phaseLabels = [
+        "Discover · 发现",
+        "Discover · 发现",
+        "Discover · 发现",
+        "Discover → Create",
+        "Create · 创作",
+        "Publish → Learn",
+        "Learn · 复盘",
+        "Next · 下一条"
+      ];
+      var currentStep = 0;
+      var autoplayTimer = null;
+      var stage = document.getElementById("stage");
+      var navButtons = Array.prototype.slice.call(document.querySelectorAll("[data-step]"));
+      var counter = document.getElementById("stage-counter");
+      var phase = document.getElementById("stage-phase");
+      var progress = document.getElementById("progress");
+      var previousButton = document.getElementById("prev-step");
+      var nextButton = document.getElementById("next-step");
+      var autoplayButton = document.getElementById("auto-play");
+      var autoplayStatus = document.getElementById("auto-status");
+      var announcement = document.getElementById("announcement");
+
+      function padStep(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function fallbackCopy(text) {
+        var input = document.createElement("textarea");
+        input.value = text;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.opacity = "0";
+        document.body.appendChild(input);
+        input.select();
+        var copied = document.execCommand("copy");
+        document.body.removeChild(input);
+        return copied;
+      }
+
+      function bindCopyButtons() {
+        var buttons = stage.querySelectorAll(".copy-button");
+        buttons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            var prompt = button.closest(".prompt-box").querySelector("pre").textContent.trim();
+            var complete = function (success) {
+              var original = button.textContent;
+              button.textContent = success ? "已复制" : "请手动复制";
+              window.setTimeout(function () {
+                button.textContent = original;
+              }, 1600);
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+              navigator.clipboard.writeText(prompt).then(function () {
+                complete(true);
+              }).catch(function () {
+                complete(fallbackCopy(prompt));
+              });
+            } else {
+              complete(fallbackCopy(prompt));
+            }
+          });
+        });
+      }
+
+      function renderStep(index, options) {
+        var config = options || {};
+        currentStep = Math.max(0, Math.min(stepTitles.length - 1, index));
+        var template = document.getElementById("step-" + currentStep);
+        stage.replaceChildren(template.content.cloneNode(true));
+
+        navButtons.forEach(function (button, buttonIndex) {
+          if (buttonIndex === currentStep) {
+            button.setAttribute("aria-current", "step");
+            if (config.scrollNav) {
+              button.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+          } else {
+            button.removeAttribute("aria-current");
+          }
+        });
+
+        counter.textContent = "步骤 " + padStep(currentStep + 1) + " / " + padStep(stepTitles.length);
+        phase.textContent = phaseLabels[currentStep];
+        progress.style.setProperty("--progress", ((currentStep + 1) / stepTitles.length * 100) + "%");
+        progress.setAttribute("aria-valuenow", String(currentStep + 1));
+        previousButton.disabled = currentStep === 0;
+        nextButton.textContent = currentStep === stepTitles.length - 1 ? "回到第一步 ↺" : "下一步 →";
+        announcement.textContent = "已切换到步骤 " + (currentStep + 1) + "：" + stepTitles[currentStep];
+        document.title = stepTitles[currentStep] + "｜下一条 NextTake 全流程演示";
+
+        bindCopyButtons();
+        if (config.focusStage) {
+          stage.focus({ preventScroll: true });
+        }
+      }
+
+      function stopAutoplay() {
+        if (autoplayTimer) {
+          window.clearInterval(autoplayTimer);
+          autoplayTimer = null;
+        }
+        autoplayButton.setAttribute("aria-pressed", "false");
+        autoplayButton.textContent = "自动播放";
+        autoplayStatus.dataset.active = "false";
+        autoplayStatus.textContent = "手动导览";
+      }
+
+      function startAutoplay() {
+        stopAutoplay();
+        autoplayButton.setAttribute("aria-pressed", "true");
+        autoplayButton.textContent = "暂停播放";
+        autoplayStatus.dataset.active = "true";
+        autoplayStatus.textContent = "正在自动播放 · 每步 7 秒";
+        autoplayTimer = window.setInterval(function () {
+          var next = currentStep === stepTitles.length - 1 ? 0 : currentStep + 1;
+          renderStep(next, { focusStage: false, scrollNav: true });
+        }, 7000);
+      }
+
+      navButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          stopAutoplay();
+          renderStep(Number(button.dataset.step), { focusStage: true, scrollNav: true });
+        });
+      });
+
+      previousButton.addEventListener("click", function () {
+        stopAutoplay();
+        renderStep(currentStep - 1, { focusStage: true, scrollNav: true });
+      });
+
+      nextButton.addEventListener("click", function () {
+        stopAutoplay();
+        var next = currentStep === stepTitles.length - 1 ? 0 : currentStep + 1;
+        renderStep(next, { focusStage: true, scrollNav: true });
+      });
+
+      autoplayButton.addEventListener("click", function () {
+        if (autoplayTimer) {
+          stopAutoplay();
+        } else {
+          startAutoplay();
+        }
+      });
+
+      function launchTour(autoplay) {
+        renderStep(0, { focusStage: false });
+        document.getElementById("demo-stage").scrollIntoView({ behavior: "smooth", block: "start" });
+        if (autoplay) {
+          window.setTimeout(startAutoplay, 500);
+        }
+      }
+
+      document.getElementById("start-tour").addEventListener("click", function () {
+        launchTour(true);
+      });
+
+      document.getElementById("replay-tour").addEventListener("click", function () {
+        launchTour(true);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        var target = event.target;
+        var typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+        if (typing || event.altKey || event.ctrlKey || event.metaKey) {
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          stopAutoplay();
+          renderStep(currentStep === stepTitles.length - 1 ? 0 : currentStep + 1, { focusStage: true, scrollNav: true });
+        }
+        if (event.key === "ArrowLeft" && currentStep > 0) {
+          stopAutoplay();
+          renderStep(currentStep - 1, { focusStage: true, scrollNav: true });
+        }
+      });
+
+      renderStep(0, { focusStage: false });
+    }());
+  </script>
+</body>
+</html>

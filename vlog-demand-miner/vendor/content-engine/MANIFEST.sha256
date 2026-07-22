@@ -1,10 +1,8 @@
-6e08801a1d17b5f069378f8de4b6e7d918aef0629088d8476c3185a0b315da21  ./.github/workflows/star-history.yml
 5fc115816513f506197cf4ea32c4fbacf0b2bd7dbc6cc9f29eb80296fdc64870  ./.gitignore
-f6deab347713e6a75c96da474de49357d58b2dc9abbf7928a02baedb87e34c0b  ./CHANGELOG.md
-9b69b736cb48fbc8704bf0d71835ac57d12bc0434cca402c53efd774f4760f0f  ./ENGINE.md
+8789148f324fe0d02ade523c8a5fb4cf6fa3e25c32c13a567944b3d442e42c6b  ./CHANGELOG.md
+5273fa2a189dab8cfb366130e64595406d6972fc7697f22486876f2d3d02fef3  ./ENGINE.md
 f50148c04443b36bdca533063631991086547af0984d692fbed247cb57e154cc  ./LICENSE
-8962e77d656d8bed22e09a428fbdbc86e6e1bf3bb05edabe3e6796153d7532c3  ./README.md
-3372c4a6300d8f62f1b6c5886ca7e15614f8ff7e0bf226f03e4d3c9391e74ce2  ./UPSTREAM.md
+84476f78b24f84906211ff886442515fa47bda1f7445208c23fff4f172679f45  ./UPSTREAM.md
 ad83196a57e0c674efddfa0711adacef647a4f181a528898798f7e81edcab483  ./adapters/perf-data/bilibili-stat/.gitattributes
 c2e06a4660b2c33585d1e0113698f10061dca355e6b247f301b3345328d8ac3c  ./adapters/perf-data/bilibili-stat/README.md
 e425b5f7c25de9b776fbd0d44b9217c408aeac765924721513814a1348585530  ./adapters/perf-data/bilibili-stat/crawler.py
@@ -43,10 +41,6 @@ fe80950232965ccf3d667ccc21eb7db020b38d8255551c4efe1ff7ba7f8e02f8  ./adapters/scr
 588e5c246e670acf5b500d9357592e8bfe5fba7657602f82f10d7e1a032bd02b  ./adapters/trend-sources/trendradar-mcp.md
 e158b7c48baa93220ab0547d769566f5a016f42fd5b7d9e95114e6821fd0b0dd  ./adapters/trend-sources/weibo-hot.md
 51b3e776a73f544e45708653c9b9aa50d197f7ec86de37f9f9d378b85523af0b  ./adapters/trend-sources/zhihu-hot.md
-c8253ede124a50b17e9d035fe4b521383e140bf6e5163badb6f754be26a2674c  ./docs/README_CN.md
-c800ca27b8404b3b37bc3a1dce1a7286bc2ad2895f23159ad08947a73381a989  ./docs/guancha-no1.svg
-5cedb90f73aac107bc426111684911bd164f915cd26156f98adc81e3e658a022  ./docs/logo.svg
-18533775c28a3cbc1f3f598dfa08760a8b2c33c102de093756dff1a178835251  ./docs/star-history.svg
 cb3603af99eed49c7ba958057ba6ae2b0699fd6457f9caf72c27df7db482a9bb  ./examples/script_patterns.example.md
 bdf3eb0b60d3bb3937fcad71262c4a562546cde0e3b074b28d340b3cb981098f  ./hooks/log-event.sh
 45a7c54adf13ad8e8214a7f7a62093a531d710a4617e98bf7d2bcb9ff3c80545  ./hooks/meta-logging.json
@@ -71,7 +65,7 @@ d763bb27bb9c77b843ee4745aa215b15a5354c0b448de2c9df36cbc197a49018  ./shared-refer
 8f3d3b9ec30aed347c60d751b2a9b4894bdc3b0ab58e938134eec727318133cf  ./shared-references/state-management.md
 6a12ceb99f958d67ddf54db34a12aaccd13a28b4730ab6a94e8c924d71f8aa8a  ./skills/calibrate/WORKFLOW.md
 955c22b5df2a3dd38480d78ab94404c8e2fff7e1ea218a1c48d6e0927d3cfc9e  ./skills/ideate/WORKFLOW.md
-6adb0efb573fec95ba47a8119466bf764765ca0ae22b62bc7e35ae97cd2c71fd  ./skills/initialize/WORKFLOW.md
+47360f07daf9968f9ced933b90c23c525b35d241cb86fb51b18acfef783cadd2  ./skills/initialize/WORKFLOW.md
 bf44539925013b9ec23b635609df7a09b582dc1ba1b343d4a7f987b3ca02408a  ./skills/learn-from/WORKFLOW.md
 753c2e6c6b7853615a66975b3f461c94c3bb1548ebb5a245d93db9ca1dd8e5fa  ./skills/migrate/WORKFLOW.md
 94dbc434c9261edc91e4ab135d8c29ad861569de32d8a45ae4d1c329741c1001  ./skills/persona/WORKFLOW.md
@@ -106,7 +100,6 @@ ccce473c731fece213add35624380546a4706d4fdd0dd4772b2c6c222220d98d  ./templates/st
 dd3339c2606433c614f421425ba2884afbf867dadb12a769e984349da5774193  ./templates/workflow.template.md
 f9516c7591e49aec807c2f4af3b5196487392abc9b3c3acaa6619e11cc132477  ./tools/diff_pct.py
 8bc78f6c17a25f4faf972e8f3843d38cc4af6763782e0ea88d6ba8c98f952847  ./tools/diff_pct_test.sh
-03eb44ae41452cbd4a542233a5174fefedc5db0032e03317ab3718750b488776  ./tools/gen-star-history.py
 1fd2b2ea7fbe49515d0fb3bd31e9911e3d6ae8f18c2e177c4f2e102a6d81c4b8  ./tools/score-curve.py
 2dd505359c5a08d8ea6bb76e07fa81d7f8987409416ad835bd993d21d56441c5  ./tools/xkcd-font.css
 236b90150639dbd5fec772f033897bb7a7feb39bbb5543818cab36b30daca225  ./uninstall.sh

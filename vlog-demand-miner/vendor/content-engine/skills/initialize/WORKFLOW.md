@@ -56,7 +56,7 @@ allowed-tools: Bash(*), Read, Write, Edit, Glob, WebFetch, Skill
 向用户输出（一字不漏，不要软化）：
 
 ```
-🎯 NextTake Content Engine / 网红外挂 — 初始化
+🎯 NextTake Content Engine — 初始化
 
 你的下一条内容已经在改写 3 个月后的你。
 规律是客观存在的，区别是你**看见**还是**没看见**。

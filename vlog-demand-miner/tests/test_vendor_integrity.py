@@ -14,6 +14,15 @@ EXPECTED_SKILLS = {
     "retro", "score", "score-blind", "ideate",
     "shoot", "status", "trends",
 }
+OMITTED_PROMOTIONAL_PATHS = {
+    ".github/workflows/star-history.yml",
+    "README.md",
+    "docs/README_CN.md",
+    "docs/guancha-no1.svg",
+    "docs/logo.svg",
+    "docs/star-history.svg",
+    "tools/gen-star-history.py",
+}
 
 
 def sha256(path: Path) -> str:
@@ -31,6 +40,11 @@ class VendorIntegrityTests(unittest.TestCase):
         self.assertEqual(skills, EXPECTED_SKILLS)
         for directory in ("adapters", "hooks", "migrations", "shared-references", "starter-rubrics", "templates", "tools"):
             self.assertTrue((VENDOR / directory).is_dir(), directory)
+
+    def test_vendor_omits_upstream_promotional_material(self) -> None:
+        for relative in sorted(OMITTED_PROMOTIONAL_PATHS):
+            with self.subTest(path=relative):
+                self.assertFalse((VENDOR / relative).exists())
 
     def test_only_nexttake_is_discoverable_as_a_skill(self) -> None:
         descriptors = sorted(path.relative_to(ROOT).as_posix() for path in ROOT.rglob("SKILL.md"))
